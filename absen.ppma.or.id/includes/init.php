@@ -9,6 +9,9 @@ if (!ob_get_level()) {
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
+// Set zona waktu ke Waktu Indonesia Barat
+date_default_timezone_set('Asia/Jakarta');
+
 // Session configuration - HARUS di atas semua output
 if (session_status() == PHP_SESSION_NONE) {
     // Atur session cookie parameters untuk subdomain
@@ -71,6 +74,33 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru' && isset($_SESSION[
                 $guru_data = $result_guru->fetch_assoc();
                 $guru_id = $guru_data['guru_id'];
                 $_SESSION['guru_id'] = $guru_id; // Simpan di session untuk akses mudah
+            } else {
+                // FALLBACK: Coba cari berdasarkan nip atau nama yang sama dengan username
+                if (isset($_SESSION['username'])) {
+                    $username = $_SESSION['username'];
+                    $sql_fallback = "SELECT guru_id FROM guru WHERE nip = ? OR nama = ? LIMIT 1";
+                    $stmt_fallback = $conn->prepare($sql_fallback);
+                    if ($stmt_fallback) {
+                        $stmt_fallback->bind_param("ss", $username, $username);
+                        $stmt_fallback->execute();
+                        $res_fallback = $stmt_fallback->get_result();
+                        if ($res_fallback->num_rows > 0) {
+                            $guru_data = $res_fallback->fetch_assoc();
+                            $guru_id = $guru_data['guru_id'];
+                            $_SESSION['guru_id'] = $guru_id;
+                            
+                            // Perbaiki relasi secara otomatis untuk ke depannya
+                            $sql_update = "UPDATE guru SET user_id = ? WHERE guru_id = ?";
+                            $stmt_update = $conn->prepare($sql_update);
+                            if ($stmt_update) {
+                                $stmt_update->bind_param("ii", $_SESSION['user_id'], $guru_id);
+                                $stmt_update->execute();
+                                $stmt_update->close();
+                            }
+                        }
+                        $stmt_fallback->close();
+                    }
+                }
             }
             $stmt_guru->close();
         } else {

@@ -629,10 +629,12 @@ function getJadwalMadin($conn, $guru_id, $hari_ini) {
     $params = [$hari_ini];
     $types = "s";
     
-    if ($guru_id) {
-        $sql_jadwal .= " AND km.guru_id = ?";
-        $types .= "i";
-        $params[] = $guru_id;
+    if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+        $filter_id = $guru_id ?: -1;
+        $sql_jadwal .= " AND (j.guru_id = ? OR km.guru_id = ?)";
+        $types .= "ii";
+        $params[] = $filter_id;
+        $params[] = $filter_id;
     }
     
     $stmt = $conn->prepare($sql_jadwal);
@@ -695,25 +697,7 @@ function cek_absensi_sudah_ada($conn, $type, $jadwal_id, $tanggal) {
 }
 
 // Ambil semua jadwal madin
-$sql_jadwal = "SELECT j.*, km.nama_kelas 
-               FROM jadwal_madin j 
-               LEFT JOIN kelas_madin km ON j.kelas_madin_id = km.kelas_id
-               WHERE j.hari = '$hari_ini'"; // Hanya jadwal hari ini
-
-// Tambahkan filter guru jika $guru_id tersedia dan valid
-if (isset($guru_id) && !empty($guru_id)) {
-    $sql_jadwal .= " AND km.guru_id = $guru_id";
-}
-
-// Eksekusi query
-$result_jadwal = $conn->query($sql_jadwal);
-$jadwal_list = [];
-
-if ($result_jadwal && $result_jadwal->num_rows > 0) {
-    while ($row = $result_jadwal->fetch_assoc()) {
-        $jadwal_list[] = $row;
-    }
-}               
+// Menggunakan getJadwalMadin() di bawah ini               
                
 // GUNAKAN FUNGSI YANG SUDAH DIPERBAIKI
 $result_jadwal = getJadwalMadin($conn, $guru_id, $hari_ini);
@@ -726,8 +710,9 @@ if ($result_jadwal && $result_jadwal->num_rows > 0) {
 
 // Ambil semua kelas madin dengan filter guru
 $sql_kelas = "SELECT * FROM kelas_madin";
-if ($guru_id) {
-    $sql_kelas .= " WHERE guru_id = $guru_id";
+if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+    $filter_id = $guru_id ?: -1;
+    $sql_kelas .= " WHERE guru_id = $filter_id";
 }
 $result_kelas = $conn->query($sql_kelas);
 $kelas_list = [];
@@ -739,8 +724,9 @@ if ($result_kelas && $result_kelas->num_rows > 0) {
 
 // Ambil semua kamar dengan filter guru
 $sql_kamar = "SELECT * FROM kamar";
-if ($guru_id) {
-    $sql_kamar .= " WHERE guru_id = $guru_id";
+if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+    $filter_id = $guru_id ?: -1;
+    $sql_kamar .= " WHERE guru_id = $filter_id";
 }
 $result_kamar = $conn->query($sql_kamar);
 $kamar_list = [];
@@ -752,8 +738,9 @@ if ($result_kamar && $result_kamar->num_rows > 0) {
 
 // Ambil semua kelas Quran dengan filter guru
 $sql_kelas_quran = "SELECT * FROM kelas_quran";
-if ($guru_id) {
-    $sql_kelas_quran .= " WHERE guru_id = $guru_id";
+if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+    $filter_id = $guru_id ?: -1;
+    $sql_kelas_quran .= " WHERE guru_id = $filter_id";
 }
 $result_kelas_quran = $conn->query($sql_kelas_quran);
 $kelas_quran_list = [];
@@ -768,8 +755,10 @@ $sql_jadwal_quran = "SELECT jq.*, kq.nama_kelas
                      FROM jadwal_quran jq 
                      LEFT JOIN kelas_quran kq ON jq.kelas_quran_id = kq.id
                      WHERE jq.hari = '$hari_ini'"; // Hanya jadwal hari ini
-if ($guru_id) {
-    $sql_jadwal_quran .= " AND kq.guru_id = $guru_id";
+
+if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+    $filter_id = $guru_id ?: -1;
+    $sql_jadwal_quran .= " AND (jq.guru_id = $filter_id OR kq.guru_id = $filter_id)";
 }                     
 $result_jadwal_quran = $conn->query($sql_jadwal_quran);
 $jadwal_quran_all = [];
@@ -786,9 +775,19 @@ if ($kelas_quran_selected) {
             FROM jadwal_quran jq 
             LEFT JOIN kelas_quran kq ON jq.kelas_quran_id = kq.id
             WHERE jq.kelas_quran_id = ?";
+            
+    if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+        $sql .= " AND (jq.guru_id = ? OR kq.guru_id = ?)";
+    }
+            
     $stmt = $conn->prepare($sql);
     if ($stmt) {
-        $stmt->bind_param("i", $kelas_quran_selected);
+        if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+            $filter_id = $guru_id ?: -1;
+            $stmt->bind_param("iii", $kelas_quran_selected, $filter_id, $filter_id);
+        } else {
+            $stmt->bind_param("i", $kelas_quran_selected);
+        }
         $stmt->execute();
         $result = $stmt->get_result();
         while ($row = $result->fetch_assoc()) {
@@ -810,18 +809,18 @@ if ($kamar_selected) {
             WHERE jk.kamar_id = ? 
             AND jk.hari = ?";
             
-    if ($guru_id) {
-        $sql .= " AND k.guru_id = ?";
+    if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+        $sql .= " AND (jk.guru_id = ? OR k.guru_id = ?)";
     }
     
     $stmt = $conn->prepare($sql);
     if ($stmt) {
-        if ($guru_id) {
-            $stmt->bind_param("isi", $kamar_selected, $hari_ini, $guru_id);
+        if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+            $filter_id = $guru_id ?: -1;
+            $stmt->bind_param("isii", $kamar_selected, $hari_ini, $filter_id, $filter_id);
         } else {
             $stmt->bind_param("is", $kamar_selected, $hari_ini);
         }
-        $stmt->bind_param("is", $kamar_selected, $hari_ini);
         $stmt->execute();
         $result = $stmt->get_result();
         
@@ -836,18 +835,18 @@ if ($kamar_selected) {
             LEFT JOIN kamar k ON jk.kamar_id = k.kamar_id
             WHERE jk.hari = ?";
             
-    if ($guru_id) {
-        $sql .= " AND k.guru_id = ?";
+    if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+        $sql .= " AND (jk.guru_id = ? OR k.guru_id = ?)";
     }
     
     $stmt = $conn->prepare($sql);
     if ($stmt) {
-        if ($guru_id) {
-            $stmt->bind_param("si", $hari_ini, $guru_id);
+        if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+            $filter_id = $guru_id ?: -1;
+            $stmt->bind_param("sii", $hari_ini, $filter_id, $filter_id);
         } else {
             $stmt->bind_param("s", $hari_ini);
         }
-        $stmt->bind_param("s", $hari_ini);
         $stmt->execute();
         $result = $stmt->get_result();
         

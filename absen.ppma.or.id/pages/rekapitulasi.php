@@ -250,6 +250,10 @@ if ($kegiatan_id) {
 
 // Ambil semua kelas untuk dropdown
 $sql_kelas = "SELECT * FROM kelas_madin";
+if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+    $filter_id = $_SESSION['guru_id'] ?? -1;
+    $sql_kelas .= " WHERE guru_id = $filter_id";
+}
 $result_kelas = $conn->query($sql_kelas);
 $kelas_list = [];
 if ($result_kelas->num_rows > 0) {
@@ -270,6 +274,10 @@ if ($result_murid->num_rows > 0) {
 
 // TAMBAHAN: Ambil semua kelas quran untuk dropdown
 $sql_kelas_quran = "SELECT * FROM kelas_quran";
+if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+    $filter_id = $_SESSION['guru_id'] ?? -1;
+    $sql_kelas_quran .= " WHERE guru_id = $filter_id";
+}
 $result_kelas_quran = $conn->query($sql_kelas_quran);
 $kelas_quran_list = [];
 if ($result_kelas_quran->num_rows > 0) {
@@ -282,6 +290,10 @@ if ($result_kelas_quran->num_rows > 0) {
 $sql_kegiatan = "SELECT jk.*, k.nama_kamar 
                 FROM jadwal_kegiatan jk
                 JOIN kamar k ON jk.kamar_id = k.kamar_id";
+if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+    $filter_id = $_SESSION['guru_id'] ?? -1;
+    $sql_kegiatan .= " WHERE jk.guru_id = $filter_id OR k.guru_id = $filter_id";
+}
 $result_kegiatan = $conn->query($sql_kegiatan);
 $kegiatan_list = [];
 if ($result_kegiatan->num_rows > 0) {

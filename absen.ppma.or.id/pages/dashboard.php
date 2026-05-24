@@ -252,7 +252,7 @@ function get_jadwal_hari_ini($conn, $hari, $table, $join_table, $id_field, $name
             JOIN $join_table k ON j.{$id_field} = k.{$id_field}
             WHERE j.hari = ?";
     
-    if ($guru_id) {
+    if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
         if ($table == 'jadwal_madin') {
             $sql .= " AND (j.guru_id = ? OR k.guru_id = ?)";
         } elseif ($table == 'jadwal_quran') {
@@ -270,8 +270,9 @@ function get_jadwal_hari_ini($conn, $hari, $table, $join_table, $id_field, $name
             throw new Exception("Error preparing statement: " . $conn->error);
         }
 
-        if ($guru_id) {
-            $stmt->bind_param("sii", $hari, $guru_id, $guru_id);
+        if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+            $filter_id = $guru_id ?: -1;
+            $stmt->bind_param("sii", $hari, $filter_id, $filter_id);
         } else {
             $stmt->bind_param("s", $hari);
         }
@@ -374,7 +375,7 @@ $sql_madin = "SELECT jm.*, km.nama_kelas
               JOIN kelas_madin km ON jm.kelas_madin_id = km.kelas_id
               WHERE jm.hari = ?";
               
-if ($guru_id) {
+if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
     $sql_madin .= " AND (jm.guru_id = ? OR km.guru_id = ?)";
 }
 $sql_madin .= " ORDER BY 
@@ -384,8 +385,9 @@ $sql_madin .= " ORDER BY
 
 $stmt_madin = $conn->prepare($sql_madin);
 if ($stmt_madin) {
-    if ($guru_id) {
-        $stmt_madin->bind_param("sii", $hari_untuk_query, $guru_id, $guru_id); // GANTI di sini
+    if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+        $filter_id = $guru_id ?: -1;
+        $stmt_madin->bind_param("sii", $hari_untuk_query, $filter_id, $filter_id); // GANTI di sini
     } else {
         $stmt_madin->bind_param("s", $hari_untuk_query); // GANTI di sini
     }
@@ -408,7 +410,7 @@ $sql_quran = "SELECT jq.*, kq.nama_kelas
               JOIN kelas_quran kq ON jq.kelas_quran_id = kq.id
               WHERE jq.hari = ?";
               
-if ($guru_id) {
+if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
     $sql_quran .= " AND (jq.guru_id = ? OR kq.guru_id = ?)";
 }
 $sql_quran .= " ORDER BY 
@@ -421,8 +423,9 @@ $sql_quran .= " ORDER BY
 
 $stmt_quran = $conn->prepare($sql_quran);
 if ($stmt_quran) {
-    if ($guru_id) {
-        $stmt_quran->bind_param("sii", $hari_untuk_query, $guru_id, $guru_id); // GANTI di sini
+    if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+        $filter_id = $guru_id ?: -1;
+        $stmt_quran->bind_param("sii", $hari_untuk_query, $filter_id, $filter_id); // GANTI di sini
     } else {
         $stmt_quran->bind_param("s", $hari_untuk_query); // GANTI di sini
     }
@@ -445,7 +448,7 @@ $sql_kegiatan = "SELECT jk.*, k.nama_kamar
                  JOIN kamar k ON jk.kamar_id = k.kamar_id
                  WHERE jk.hari = ?";
                  
-if ($guru_id) {
+if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
     $sql_kegiatan .= " AND (jk.guru_id = ? OR k.guru_id = ?)";
 }
 $sql_kegiatan .= " ORDER BY 
@@ -460,8 +463,9 @@ $sql_kegiatan .= " ORDER BY
 
 $stmt_kegiatan = $conn->prepare($sql_kegiatan);
 if ($stmt_kegiatan) {
-    if ($guru_id) {
-        $stmt_kegiatan->bind_param("sii", $hari_untuk_query, $guru_id, $guru_id); // GANTI di sini
+    if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+        $filter_id = $guru_id ?: -1;
+        $stmt_kegiatan->bind_param("sii", $hari_untuk_query, $filter_id, $filter_id); // GANTI di sini
     } else {
         $stmt_kegiatan->bind_param("s", $hari_untuk_query); // GANTI di sini
     }
@@ -565,7 +569,7 @@ $sql_pelanggaran = "SELECT p.*, m.nama, km.nama_kelas
                     LEFT JOIN kelas_madin km ON m.kelas_madin_id = km.kelas_id
                     WHERE p.tanggal >= DATE_SUB(CURDATE(), INTERVAL 3 DAY)";
                     
-if ($guru_id) {
+if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
     $sql_pelanggaran .= " AND (km.guru_id = ? OR m.kelas_quran_id IN (
                             SELECT id FROM kelas_quran WHERE guru_id = ?
                          ) OR m.kamar_id IN (
@@ -585,8 +589,9 @@ $sql_pelanggaran .= " ORDER BY
 
 $stmt_pelanggaran = $conn->prepare($sql_pelanggaran);
 if ($stmt_pelanggaran) {
-    if ($guru_id) {
-        $stmt_pelanggaran->bind_param("iii", $guru_id, $guru_id, $guru_id);
+    if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+        $filter_id = $guru_id ?: -1;
+        $stmt_pelanggaran->bind_param("iii", $filter_id, $filter_id, $filter_id);
     } elseif (isset($_SESSION['role']) && $_SESSION['role'] === 'wali_murid' && isset($_SESSION['murid_id'])) {
         $stmt_pelanggaran->bind_param("i", $_SESSION['murid_id']);
     } elseif (isset($_SESSION['role']) && $_SESSION['role'] === 'wali_kelas' && isset($_SESSION['kelas_id'])) {
@@ -612,7 +617,7 @@ $sql_perizinan = "SELECT p.*, m.nama, km.nama_kelas
                   LEFT JOIN kelas_madin km ON m.kelas_madin_id = km.kelas_id
                   WHERE p.tanggal >= DATE_SUB(CURDATE(), INTERVAL 3 DAY)";
                   
-if ($guru_id) {
+if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
     $sql_perizinan .= " AND (km.guru_id = ? OR m.kelas_quran_id IN (
                             SELECT id FROM kelas_quran WHERE guru_id = ?
                          ) OR m.kamar_id IN (
@@ -633,8 +638,9 @@ $sql_perizinan .= " ORDER BY
 
 $stmt_perizinan = $conn->prepare($sql_perizinan);
 if ($stmt_perizinan) {
-    if ($guru_id) {
-        $stmt_perizinan->bind_param("iii", $guru_id, $guru_id, $guru_id);
+    if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+        $filter_id = $guru_id ?: -1;
+        $stmt_perizinan->bind_param("iii", $filter_id, $filter_id, $filter_id);
     } elseif (isset($_SESSION['role']) && $_SESSION['role'] === 'wali_murid' && isset($_SESSION['murid_id'])) {
         $stmt_perizinan->bind_param("i", $_SESSION['murid_id']);
     } elseif (isset($_SESSION['role']) && $_SESSION['role'] === 'wali_kelas' && isset($_SESSION['kelas_id'])) {

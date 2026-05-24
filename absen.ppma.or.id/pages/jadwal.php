@@ -2,24 +2,21 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// Mulai session dan include koneksi database
-session_start();
-require_once '../includes/config.php';
+// Include init.php yang sudah menangani session, koneksi, timezone, dan check_auth
+require_once '../includes/init.php';
 
-// Filter data untuk role guru
-$guru_id = null;
-if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru' && isset($_SESSION['guru_id'])) {
-    $guru_id = $_SESSION['guru_id'];
-}
-
-// Fungsi check_auth sederhana
-function check_auth() {
-    return isset($_SESSION['user_id']) || isset($_SESSION['guru_id']);
-}
-
+// Pastikan user sudah login
 if (!check_auth()) {
     header("Location: ../index.php");
     exit();
+}
+
+// $guru_id sudah diset otomatis di init.php untuk role 'guru'
+// Tapi kita pastikan lagi agar variabelnya tersedia untuk script di bawah
+if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru' && isset($_SESSION['guru_id'])) {
+    $guru_id = $_SESSION['guru_id'];
+} else {
+    $guru_id = null;
 }
 
 // Fungsi untuk mengurutkan hari
@@ -83,8 +80,9 @@ $sql_jadwal = "SELECT j.*, g.nama as nama_guru, g.no_hp as no_hp_guru, k.nama_ke
                LEFT JOIN kelas_madin k ON j.kelas_madin_id = k.kelas_id 
                WHERE 1=1";
 
-if ($guru_id) {
-    $sql_jadwal .= " AND j.guru_id = ?";
+if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+    // Tampilkan yang dia ajar ATAU yang dia wali kelas-kan
+    $sql_jadwal .= " AND (j.guru_id = ? OR k.guru_id = ?)";
 } elseif (isset($_SESSION['role']) && $_SESSION['role'] === 'wali_murid' && isset($_SESSION['murid_id'])) {
     $sql_jadwal .= " AND j.kelas_madin_id = (SELECT kelas_madin_id FROM murid WHERE murid_id = ?)";
 } elseif (isset($_SESSION['role']) && $_SESSION['role'] === 'wali_kelas' && isset($_SESSION['kelas_id'])) {
@@ -95,8 +93,10 @@ $sql_jadwal .= " ORDER BY FIELD(j.hari, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jum
 
 $stmt_jadwal = $conn->prepare($sql_jadwal);
 if ($stmt_jadwal) {
-    if ($guru_id) {
-        $stmt_jadwal->bind_param("i", $guru_id);
+    if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+        // Jika guru_id tidak ada, kita force ke -1 agar tidak menampilkan semua jadwal
+        $filter_id = $guru_id ?: -1;
+        $stmt_jadwal->bind_param("ii", $filter_id, $filter_id);
     } elseif (isset($_SESSION['role']) && $_SESSION['role'] === 'wali_murid' && isset($_SESSION['murid_id'])) {
         $stmt_jadwal->bind_param("i", $_SESSION['murid_id']);
     } elseif (isset($_SESSION['role']) && $_SESSION['role'] === 'wali_kelas' && isset($_SESSION['kelas_id'])) {
@@ -123,8 +123,8 @@ $sql_kegiatan = "SELECT kg.*, g.nama as nama_guru, g.no_hp as no_hp_guru, k.nama
                  LEFT JOIN kamar k ON kg.kamar_id = k.kamar_id 
                  WHERE 1=1";
 
-if ($guru_id) {
-    $sql_kegiatan .= " AND kg.guru_id = ?";
+if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+    $sql_kegiatan .= " AND (kg.guru_id = ? OR k.guru_id = ?)";
 } elseif (isset($_SESSION['role']) && $_SESSION['role'] === 'wali_murid' && isset($_SESSION['murid_id'])) {
     $sql_kegiatan .= " AND kg.kamar_id = (SELECT kamar_id FROM murid WHERE murid_id = ?)";
 }
@@ -133,8 +133,9 @@ $sql_kegiatan .= " ORDER BY FIELD(kg.hari, 'Senin', 'Selasa', 'Rabu', 'Kamis', '
 
 $stmt_kegiatan = $conn->prepare($sql_kegiatan);
 if ($stmt_kegiatan) {
-    if ($guru_id) {
-        $stmt_kegiatan->bind_param("i", $guru_id);
+    if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+        $filter_id = $guru_id ?: -1;
+        $stmt_kegiatan->bind_param("ii", $filter_id, $filter_id);
     } elseif (isset($_SESSION['role']) && $_SESSION['role'] === 'wali_murid' && isset($_SESSION['murid_id'])) {
         $stmt_kegiatan->bind_param("i", $_SESSION['murid_id']);
     }
@@ -207,8 +208,8 @@ $sql_jadwal_quran = "SELECT jq.*, g.nama as nama_guru, g.no_hp as no_hp_guru, kq
                      LEFT JOIN kelas_quran kq ON jq.kelas_quran_id = kq.id 
                      WHERE 1=1";
 
-if ($guru_id) {
-    $sql_jadwal_quran .= " AND jq.guru_id = ?";
+if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+    $sql_jadwal_quran .= " AND (jq.guru_id = ? OR kq.guru_id = ?)";
 } elseif (isset($_SESSION['role']) && $_SESSION['role'] === 'wali_murid' && isset($_SESSION['murid_id'])) {
     $sql_jadwal_quran .= " AND jq.kelas_quran_id = (SELECT kelas_quran_id FROM murid WHERE murid_id = ?)";
 }
@@ -217,8 +218,9 @@ $sql_jadwal_quran .= " ORDER BY FIELD(jq.hari, 'Senin', 'Selasa', 'Rabu', 'Kamis
 
 $stmt_jadwal_quran = $conn->prepare($sql_jadwal_quran);
 if ($stmt_jadwal_quran) {
-    if ($guru_id) {
-        $stmt_jadwal_quran->bind_param("i", $guru_id);
+    if (isset($_SESSION['role']) && $_SESSION['role'] === 'guru') {
+        $filter_id = $guru_id ?: -1;
+        $stmt_jadwal_quran->bind_param("ii", $filter_id, $filter_id);
     } elseif (isset($_SESSION['role']) && $_SESSION['role'] === 'wali_murid' && isset($_SESSION['murid_id'])) {
         $stmt_jadwal_quran->bind_param("i", $_SESSION['murid_id']);
     }
