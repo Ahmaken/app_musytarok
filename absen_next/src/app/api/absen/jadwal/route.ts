@@ -3,6 +3,7 @@ import pool from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth/jwt';
+import { resolveAsrama } from '@/lib/auth/resolveAsrama';
 
 export async function GET() {
   try {
@@ -13,7 +14,11 @@ export async function GET() {
     const payload = verifyToken(token);
     if (!payload) return NextResponse.json({ error: 'Token invalid' }, { status: 401 });
 
-    const { role, guruId, namaAsrama } = payload as any;
+    const { role, guruId, userId, username } = payload as any;
+    const tokenAsrama = (payload as any).namaAsrama || null;
+    const namaAsrama = (role === 'pengurus_asrama')
+      ? await resolveAsrama(userId, role, username || '', tokenAsrama)
+      : tokenAsrama;
 
     if (role === 'wali_murid') {
       return NextResponse.json({ error: 'Akses ditolak. Wali murid tidak memiliki akses ke fitur absensi.' }, { status: 403 });
@@ -79,7 +84,13 @@ export async function GET() {
         )`;
         paramsMadin.push(namaAsrama);
 
-        // Pengurus asrama diberikan akses ke semua jadwal quran hari ini (tanpa filter asrama)
+        // Hanya jadwal quran yang ada santri dari asrama ini (filter per asrama)
+        queryQuran += ` AND j.kelas_quran_id IN (
+          SELECT DISTINCT m.kelas_quran_id FROM murid m
+          JOIN kamar km ON m.kamar_id = km.kamar_id
+          WHERE km.nama_asrama = ? AND m.kelas_quran_id IS NOT NULL
+        )`;
+        paramsQuran.push(namaAsrama);
 
         // Hanya kegiatan untuk kamar di asrama ini
         queryKegiatan += ` AND j.kamar_id IN (

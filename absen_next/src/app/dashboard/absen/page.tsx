@@ -9,11 +9,19 @@ export default function InputAbsenPage() {
   const [loading, setLoading] = useState(true);
   const [hari, setHari] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [role, setRole] = useState<string>('');
 
   useEffect(() => {
     const fetchSchedules = async () => {
       try {
-        const res = await fetch('/api/absen/jadwal');
+        // Fetch role info in parallel with schedules
+        const [resMe, res] = await Promise.all([
+          fetch('/api/auth/me'),
+          fetch('/api/absen/jadwal')
+        ]);
+        const meData = await resMe.json();
+        if (meData.success) setRole(meData.user.role);
+
         const json = await res.json();
         if (res.ok && json.success) {
           setSchedules(json.data);
@@ -42,7 +50,9 @@ export default function InputAbsenPage() {
             <CalendarCheck size={28} /> Jadwal Anda Hari Ini
           </h1>
           <p className="text-blue-600 dark:text-blue-300 text-sm mt-1 font-medium max-w-md">
-            Pilih kelas untuk mulai menginput data kehadiran santri.
+            {role === 'pengurus_asrama'
+              ? 'Pilih kelas untuk mulai menginput data kehadiran santri asrama Anda.'
+              : 'Pilih kelas untuk mulai menginput data kehadiran santri.'}
           </p>
         </div>
       </div>
@@ -73,9 +83,13 @@ export default function InputAbsenPage() {
           <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-full w-16 h-16 mx-auto flex items-center justify-center mb-4 text-gray-400">
             <CalendarCheck size={32} />
           </div>
-          <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">Tidak Ada Jadwal Mengajar</h3>
+          <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">
+            {role === 'pengurus_asrama' ? 'Tidak Ada Jadwal Hari Ini' : 'Tidak Ada Jadwal Mengajar'}
+          </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-sm mx-auto">
-            Anda tidak memiliki jadwal mengajar pada hari ini.
+            {role === 'pengurus_asrama'
+              ? 'Tidak ada jadwal kelas pada hari ini untuk asrama Anda.'
+              : 'Anda tidak memiliki jadwal mengajar pada hari ini.'}
           </p>
         </div>
       ) : (

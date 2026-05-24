@@ -66,14 +66,33 @@ export async function GET(request: Request) {
     let query = '';
     let params: any[] = [kelas_id];
 
-    if (tipe === 'madin') {
-      query = 'SELECT murid_id, nis, nama FROM murid WHERE kelas_madin_id = ? ORDER BY nama ASC';
-    } else if (tipe === 'quran') {
-      query = 'SELECT murid_id, nis, nama FROM murid WHERE kelas_quran_id = ? ORDER BY nama ASC';
-    } else if (tipe === 'kegiatan') {
-      query = 'SELECT murid_id, nis, nama FROM murid WHERE kamar_id = ? ORDER BY nama ASC';
+    if (role === 'pengurus_asrama' && namaAsrama) {
+      // Pengurus asrama hanya melihat santri dari asrama mereka sendiri
+      if (tipe === 'madin') {
+        query = `SELECT murid_id, nis, nama FROM murid m
+          JOIN kamar km ON m.kamar_id = km.kamar_id
+          WHERE m.kelas_madin_id = ? AND km.nama_asrama = ? ORDER BY m.nama ASC`;
+        params = [kelas_id, namaAsrama];
+      } else if (tipe === 'quran') {
+        query = `SELECT murid_id, nis, nama FROM murid m
+          JOIN kamar km ON m.kamar_id = km.kamar_id
+          WHERE m.kelas_quran_id = ? AND km.nama_asrama = ? ORDER BY m.nama ASC`;
+        params = [kelas_id, namaAsrama];
+      } else if (tipe === 'kegiatan') {
+        query = 'SELECT murid_id, nis, nama FROM murid WHERE kamar_id = ? ORDER BY nama ASC';
+      } else {
+        return NextResponse.json({ error: 'Tipe tidak valid' }, { status: 400 });
+      }
     } else {
-      return NextResponse.json({ error: 'Tipe tidak valid' }, { status: 400 });
+      if (tipe === 'madin') {
+        query = 'SELECT murid_id, nis, nama FROM murid WHERE kelas_madin_id = ? ORDER BY nama ASC';
+      } else if (tipe === 'quran') {
+        query = 'SELECT murid_id, nis, nama FROM murid WHERE kelas_quran_id = ? ORDER BY nama ASC';
+      } else if (tipe === 'kegiatan') {
+        query = 'SELECT murid_id, nis, nama FROM murid WHERE kamar_id = ? ORDER BY nama ASC';
+      } else {
+        return NextResponse.json({ error: 'Tipe tidak valid' }, { status: 400 });
+      }
     }
 
     const [murid] = await pool.execute<RowDataPacket[]>(query, params);
