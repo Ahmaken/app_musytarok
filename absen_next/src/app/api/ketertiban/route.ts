@@ -76,6 +76,7 @@ export async function GET(request: Request) {
         nama: r.nama,
         kelas: '-',
         tanggal: new Date(r.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
+        raw_tanggal: r.tanggal,
         keterangan: r.keterangan || r.status,
         ditindak: true
       }));
@@ -99,6 +100,7 @@ export async function GET(request: Request) {
         nama: r.nama,
         kelas: '-',
         tanggal: new Date(r.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
+        raw_tanggal: r.tanggal,
         jenis: r.jenis,
         poin: 0,
         ditindak: true

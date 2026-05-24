@@ -11,6 +11,8 @@ export default function KetertibanPage() {
   const [dataPelanggaran, setDataPelanggaran] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState('');
+  const [search, setSearch] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' } | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -39,6 +41,57 @@ export default function KetertibanPage() {
       })
       .catch(console.error);
   }, []);
+
+  const requestSort = (key: string) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (key: string) => {
+    if (!sortConfig || sortConfig.key !== key) return ' ⇅';
+    return sortConfig.direction === 'ascending' ? ' ▲' : ' ▼';
+  };
+
+  // Filter data berdasarkan kata kunci pencarian
+  const filteredAlpa = dataAlpa.filter(item =>
+    item.nama?.toLowerCase().includes(search.toLowerCase()) ||
+    item.kelas?.toLowerCase().includes(search.toLowerCase()) ||
+    item.keterangan?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const filteredPelanggaran = dataPelanggaran.filter(item =>
+    item.nama?.toLowerCase().includes(search.toLowerCase()) ||
+    item.kelas?.toLowerCase().includes(search.toLowerCase()) ||
+    item.jenis?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  // Fungsi pengurutan universal
+  const sortData = (dataList: any[]) => {
+    if (!sortConfig) return dataList;
+    return [...dataList].sort((a, b) => {
+      let valA = a[sortConfig.key];
+      let valB = b[sortConfig.key];
+
+      // Penanganan khusus untuk tanggal menggunakan raw_tanggal
+      if (sortConfig.key === 'tanggal') {
+        const dateA = a.raw_tanggal ? new Date(a.raw_tanggal).getTime() : 0;
+        const dateB = b.raw_tanggal ? new Date(b.raw_tanggal).getTime() : 0;
+        return sortConfig.direction === 'ascending' ? dateA - dateB : dateB - dateA;
+      }
+
+      if (valA === null || valA === undefined) valA = '';
+      if (valB === null || valB === undefined) valB = '';
+
+      const compareResult = valA.toString().localeCompare(valB.toString(), undefined, { numeric: true, sensitivity: 'base' });
+      return sortConfig.direction === 'ascending' ? compareResult : -compareResult;
+    });
+  };
+
+  const sortedAlpa = sortData(filteredAlpa);
+  const sortedPelanggaran = sortData(filteredPelanggaran);
 
   const handleDelete = async (id: number) => {
     if (confirm('Apakah Anda yakin ingin menghapus data pelanggaran ini?')) {
@@ -103,6 +156,8 @@ export default function KetertibanPage() {
           <input 
             type="text" 
             placeholder="Cari nama murid..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500 dark:text-gray-200 transition-colors"
           />
         </div>
@@ -134,18 +189,18 @@ export default function KetertibanPage() {
             <table className="w-full text-left text-sm whitespace-nowrap">
               <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 font-bold border-b border-gray-100 dark:border-gray-700">
                 <tr>
-                  <th className="px-4 py-4">Nama Siswa</th>
-                  <th className="px-4 py-4">Kelas</th>
-                  <th className="px-4 py-4">Keterangan</th>
-                  <th className="px-4 py-4">Tanggal</th>
-                  <th className="px-4 py-4 text-center">Status</th>
+                  <th className="px-4 py-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none" onClick={() => requestSort('nama')}>Nama Siswa{getSortIcon('nama')}</th>
+                  <th className="px-4 py-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none" onClick={() => requestSort('kelas')}>Kelas{getSortIcon('kelas')}</th>
+                  <th className="px-4 py-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none" onClick={() => requestSort('keterangan')}>Keterangan{getSortIcon('keterangan')}</th>
+                  <th className="px-4 py-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none" onClick={() => requestSort('tanggal')}>Tanggal{getSortIcon('tanggal')}</th>
+                  <th className="px-4 py-4 text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none" onClick={() => requestSort('ditindak')}>Status{getSortIcon('ditindak')}</th>
                   <th className="px-4 py-4 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {dataAlpa.length === 0 ? (
-                  <tr><td colSpan={6} className="text-center py-4">Tidak ada data Alpa/Izin.</td></tr>
-                ) : dataAlpa.map((item) => (
+                {sortedAlpa.length === 0 ? (
+                  <tr><td colSpan={6} className="text-center py-8 text-gray-500">Tidak ada data Alpa/Izin.</td></tr>
+                ) : sortedAlpa.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors text-gray-700 dark:text-gray-200">
                     <td className="px-4 py-3 font-bold">{item.nama}</td>
                     <td className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400">{item.kelas}</td>
@@ -209,19 +264,19 @@ export default function KetertibanPage() {
             <table className="w-full text-left text-sm whitespace-nowrap">
               <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 font-bold border-b border-gray-100 dark:border-gray-700">
                 <tr>
-                  <th className="px-4 py-4">Nama Siswa</th>
-                  <th className="px-4 py-4">Kelas</th>
-                  <th className="px-4 py-4">Jenis Pelanggaran</th>
-                  <th className="px-4 py-4">Poin</th>
-                  <th className="px-4 py-4">Tanggal</th>
-                  <th className="px-4 py-4 text-center">Status</th>
+                  <th className="px-4 py-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none" onClick={() => requestSort('nama')}>Nama Siswa{getSortIcon('nama')}</th>
+                  <th className="px-4 py-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none" onClick={() => requestSort('kelas')}>Kelas{getSortIcon('kelas')}</th>
+                  <th className="px-4 py-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none" onClick={() => requestSort('jenis')}>Jenis Pelanggaran{getSortIcon('jenis')}</th>
+                  <th className="px-4 py-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none" onClick={() => requestSort('poin')}>Poin{getSortIcon('poin')}</th>
+                  <th className="px-4 py-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none" onClick={() => requestSort('tanggal')}>Tanggal{getSortIcon('tanggal')}</th>
+                  <th className="px-4 py-4 text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none" onClick={() => requestSort('ditindak')}>Status{getSortIcon('ditindak')}</th>
                   <th className="px-4 py-4 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {dataPelanggaran.length === 0 ? (
-                  <tr><td colSpan={7} className="text-center py-4">Tidak ada data pelanggaran lain.</td></tr>
-                ) : dataPelanggaran.map((item) => (
+                {sortedPelanggaran.length === 0 ? (
+                  <tr><td colSpan={7} className="text-center py-8 text-gray-500">Tidak ada data pelanggaran lain.</td></tr>
+                ) : sortedPelanggaran.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors text-gray-700 dark:text-gray-200">
                     <td className="px-4 py-3 font-bold">{item.nama}</td>
                     <td className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400">{item.kelas}</td>
