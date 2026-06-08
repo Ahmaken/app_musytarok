@@ -154,9 +154,11 @@ export default function ProfilPage() {
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Username</label>
               <div className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-3 text-gray-700 dark:text-gray-200 font-medium flex justify-between items-center">
                 {user?.username || '-'}
-                <button onClick={() => setIsEditing(true)} className="text-green-600 dark:text-green-400 text-xs font-bold hover:underline">
-                  UBAH
-                </button>
+                {user?.role !== 'tamu' && (
+                  <button onClick={() => setIsEditing(true)} className="text-green-600 dark:text-green-400 text-xs font-bold hover:underline">
+                    UBAH
+                  </button>
+                )}
               </div>
             </div>
             <div>
@@ -169,9 +171,11 @@ export default function ProfilPage() {
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Keamanan</label>
               <div className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-3 flex justify-between items-center">
                 <span className="text-gray-500 dark:text-gray-400 font-medium tracking-[0.2em]">••••••••</span>
-                <button onClick={() => setIsEditing(true)} className="text-green-600 dark:text-green-400 text-xs font-bold hover:underline">
-                  UBAH PASSWORD
-                </button>
+                {user?.role !== 'tamu' && (
+                  <button onClick={() => setIsEditing(true)} className="text-green-600 dark:text-green-400 text-xs font-bold hover:underline">
+                    UBAH PASSWORD
+                  </button>
+                )}
               </div>
             </div>
             

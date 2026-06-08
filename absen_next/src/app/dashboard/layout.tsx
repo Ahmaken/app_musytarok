@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, CalendarDays, ClipboardCheck, Bell, User, Moon, Sun, Clock, Menu, X, LogOut, Settings, Users, FileWarning, MessageSquare, MessageCircle, UserCog, BookOpen, QrCode, Fingerprint, AlertTriangle, GraduationCap, Eye, Download } from 'lucide-react';
+import { Home, CalendarDays, ClipboardCheck, Bell, User, Moon, Sun, Clock, Menu, X, LogOut, Settings, Users, FileWarning, MessageSquare, MessageCircle, UserCog, BookOpen, QrCode, Fingerprint, AlertTriangle, GraduationCap, UserRound, Download } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
@@ -290,7 +290,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/30 dark:to-orange-900/20 border border-amber-200 dark:border-amber-700/50 rounded-2xl p-3 shadow-sm">
                   <div className="flex gap-3 items-start">
                     <div className="bg-amber-100 dark:bg-amber-800 text-amber-600 dark:text-amber-300 p-2 rounded-xl flex-shrink-0">
-                      <Eye size={18} />
+                      <UserRound size={18} />
                     </div>
                     <div>
                       <h5 className="font-bold text-xs text-gray-800 dark:text-gray-200 mb-1">Mode Tamu</h5>
@@ -529,7 +529,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Banner Tamu di halaman */}
         {isTamu && (
           <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-2xl text-amber-800 dark:text-amber-300">
-            <Eye size={16} className="shrink-0" />
+            <UserRound size={16} className="shrink-0" />
             <span className="text-xs font-semibold">Mode Tamu — Anda hanya dapat melihat tampilan aplikasi. Tidak ada data yang ditampilkan.</span>
             <button
               onClick={async () => { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/'; }}

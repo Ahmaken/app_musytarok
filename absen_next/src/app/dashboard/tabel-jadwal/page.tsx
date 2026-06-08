@@ -226,6 +226,11 @@ export default function TabelJadwalPage() {
     teacherCodeMap[g.id] = getTeacherCode(idx + 1);
   });
 
+  // Natural sort helper: sorts strings with embedded numbers properly (A1, A2, A10 not A1, A10, A2)
+  const naturalSort = (a: ClassOption, b: ClassOption) => {
+    return a.nama.localeCompare(b.nama, undefined, { numeric: true, sensitivity: 'base' });
+  };
+
   // Dynamic grouping & classification helpers
   const getQuranCategory = (name: string): string => {
     const n = name.toUpperCase();
@@ -261,7 +266,7 @@ export default function TabelJadwalPage() {
             return n.includes('ULA') || n.includes('TQ PUTRI');
           }
         }
-      });
+      }).sort(naturalSort);
     } else if (activeTab === 'quran') {
       return classesQuran.filter(c => {
         const n = c.nama.toUpperCase();
@@ -271,10 +276,10 @@ export default function TabelJadwalPage() {
         if (!matchesAsrama) return false;
 
         return getQuranCategory(c.nama) === quranLevelTab;
-      });
+      }).sort(naturalSort);
     } else {
-      // Kegiatan Asrama
-      return rooms.filter(r => r.nama_asrama === activeAsrama);
+      // Kegiatan Asrama - natural sort so A1, A2, A10 sort correctly
+      return rooms.filter(r => r.nama_asrama === activeAsrama).sort(naturalSort);
     }
   };
 
@@ -577,11 +582,11 @@ export default function TabelJadwalPage() {
       </div>
 
       {/* Main Schedule Type Tabs */}
-      <div className="flex bg-white dark:bg-gray-800 p-1.5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-x-auto">
+      <div className="flex w-full bg-white dark:bg-gray-800 p-1.5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
         {(role === 'admin' || role === 'staff' || jadwalList.some(s => s.tipe === 'quran')) && (
         <button 
           onClick={() => { setActiveTab('quran'); setActiveAsrama('Asrama A'); }} 
-          className={`flex-1 min-w-[120px] py-3 text-sm font-extrabold rounded-xl transition-all ${
+          className={`flex-1 py-3 text-sm font-extrabold rounded-xl transition-all text-center ${
             activeTab === 'quran' ? 'bg-emerald-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
           }`}
         >
@@ -591,7 +596,7 @@ export default function TabelJadwalPage() {
         {(role === 'admin' || role === 'staff' || jadwalList.some(s => s.tipe === 'madin')) && (
         <button 
           onClick={() => { setActiveTab('madin'); setGenderMode('PUTRA'); }} 
-          className={`flex-1 min-w-[120px] py-3 text-sm font-extrabold rounded-xl transition-all ${
+          className={`flex-1 py-3 text-sm font-extrabold rounded-xl transition-all text-center ${
             activeTab === 'madin' ? 'bg-teal-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
           }`}
         >
@@ -601,7 +606,7 @@ export default function TabelJadwalPage() {
         {(role === 'admin' || role === 'staff' || jadwalList.some(s => s.tipe === 'kegiatan')) && (
         <button 
           onClick={() => { setActiveTab('kegiatan'); setActiveAsrama('Asrama A'); }} 
-          className={`flex-1 min-w-[120px] py-3 text-sm font-extrabold rounded-xl transition-all ${
+          className={`flex-1 py-3 text-sm font-extrabold rounded-xl transition-all text-center ${
             activeTab === 'kegiatan' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
           }`}
         >
@@ -611,40 +616,40 @@ export default function TabelJadwalPage() {
       </div>
 
       {/* Toggles & Filters Section */}
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col gap-3">
         
-        {/* Dynamic Secondary Options */}
-        <div className="flex flex-wrap items-center gap-3">
+        {/* Dynamic Secondary Options (Asrama / PUTRA-PUTRI) */}
+        <div className="w-full">
           
           {/* Madin secondary option (Gender) */}
           {activeTab === 'madin' && (
-            <div className="flex bg-gray-100 dark:bg-gray-900 p-1 rounded-xl border border-gray-200/50 dark:border-gray-700">
+            <div className="flex w-full bg-gray-100 dark:bg-gray-900 p-1 rounded-xl border border-gray-200/50 dark:border-gray-700">
               <button
                 onClick={() => setGenderMode('PUTRA')}
-                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${genderMode === 'PUTRA' ? 'bg-white dark:bg-gray-800 text-green-700 dark:text-green-400 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center ${genderMode === 'PUTRA' ? 'bg-white dark:bg-gray-800 text-green-700 dark:text-green-400 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 PUTRA
               </button>
               <button
                 onClick={() => setGenderMode('PUTRI')}
-                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${genderMode === 'PUTRI' ? 'bg-white dark:bg-gray-800 text-green-700 dark:text-green-400 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center ${genderMode === 'PUTRI' ? 'bg-white dark:bg-gray-800 text-green-700 dark:text-green-400 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 PUTRI
               </button>
             </div>
           )}
 
-          {/* Qur'an / Kegiatan secondary options (Asrama Selection) */}
+          {/* Qur'an Asrama selection */}
           {activeTab === 'quran' && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex w-full bg-gray-100 dark:bg-gray-900 p-1 rounded-xl border border-gray-200/50 dark:border-gray-700 flex-wrap gap-1">
               {ASRAMAS_QURAN.map((asr) => (
                 <button
                   key={asr}
                   onClick={() => setActiveAsrama(asr)}
-                  className={`px-3 py-2 text-xs font-bold rounded-xl border transition-all ${
+                  className={`flex-1 min-w-[80px] py-2 text-xs font-bold rounded-lg transition-all text-center ${
                     activeAsrama === asr 
-                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-400 shadow-sm' 
-                      : 'border-gray-200/60 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-500 dark:text-gray-400'
+                      ? 'bg-emerald-500 text-white shadow-sm' 
+                      : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                   }`}
                 >
                   {asr}
@@ -653,16 +658,17 @@ export default function TabelJadwalPage() {
             </div>
           )}
 
+          {/* Kegiatan Asrama selection */}
           {activeTab === 'kegiatan' && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex w-full bg-gray-100 dark:bg-gray-900 p-1 rounded-xl border border-gray-200/50 dark:border-gray-700">
               {ASRAMAS_KEGIATAN.map((asr) => (
                 <button
                   key={asr}
                   onClick={() => setActiveAsrama(asr)}
-                  className={`px-3 py-2 text-xs font-bold rounded-xl border transition-all ${
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center ${
                     activeAsrama === asr 
-                      ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-400 shadow-sm' 
-                      : 'border-gray-200/60 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-500 dark:text-gray-400'
+                      ? 'bg-blue-500 text-white shadow-sm' 
+                      : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                   }`}
                 >
                   {asr}
@@ -673,16 +679,16 @@ export default function TabelJadwalPage() {
 
         </div>
 
-        {/* Dynamic Tertiary Option Selector (Sub-tabs) */}
-        <div className="flex items-center gap-3 w-full md:w-auto self-end md:self-center">
+        {/* Dynamic Tertiary Option Selector (Level Sub-tabs) */}
+        <div className="w-full">
           
-          {/* Sub-tabs Selector */}
-          <div className="inline-flex bg-gray-100 dark:bg-gray-900/50 p-1 rounded-xl border border-gray-200/50 dark:border-gray-700 w-full md:w-auto overflow-x-auto">
+          {/* Sub-tabs Level - full width evenly distributed */}
+          <div className="flex w-full bg-gray-100 dark:bg-gray-900/50 p-1 rounded-xl border border-gray-200/50 dark:border-gray-700">
             {activeTab === 'madin' && (
               <>
                 <button
                   onClick={() => setLevelTab(genderMode === 'PUTRA' ? 'WUSTHO_MAK' : 'WUSTHO')}
-                  className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all flex-1 md:flex-initial whitespace-nowrap ${
+                  className={`flex-1 py-2 text-[11px] font-bold rounded-lg transition-all text-center ${
                     levelTab !== 'ULA' 
                       ? 'bg-white dark:bg-gray-800 text-green-700 dark:text-green-400 shadow-sm' 
                       : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
@@ -692,7 +698,7 @@ export default function TabelJadwalPage() {
                 </button>
                 <button
                   onClick={() => setLevelTab('ULA')}
-                  className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all flex-1 md:flex-initial whitespace-nowrap ${
+                  className={`flex-1 py-2 text-[11px] font-bold rounded-lg transition-all text-center ${
                     levelTab === 'ULA' 
                       ? 'bg-white dark:bg-gray-800 text-green-700 dark:text-green-400 shadow-sm' 
                       : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
@@ -707,7 +713,7 @@ export default function TabelJadwalPage() {
               <button
                 key={lvl}
                 onClick={() => setQuranLevelTab(lvl)}
-                className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all flex-1 md:flex-initial capitalize whitespace-nowrap ${
+                className={`flex-1 py-2 text-[11px] font-bold rounded-lg transition-all capitalize text-center ${
                   quranLevelTab === lvl 
                     ? 'bg-white dark:bg-gray-800 text-emerald-700 dark:text-emerald-400 shadow-sm' 
                     : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
@@ -721,7 +727,7 @@ export default function TabelJadwalPage() {
               <button
                 key={lvl}
                 onClick={() => setKegiatanLevelTab(lvl)}
-                className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all flex-1 md:flex-initial capitalize whitespace-nowrap ${
+                className={`flex-1 py-2 text-[11px] font-bold rounded-lg transition-all capitalize text-center ${
                   kegiatanLevelTab === lvl 
                     ? 'bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-400 shadow-sm' 
                     : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
@@ -816,7 +822,7 @@ export default function TabelJadwalPage() {
                       className="hover:bg-gray-50/30 dark:hover:bg-gray-800/10 transition-colors"
                     >
                       {/* Class Header cell */}
-                      <td className="px-2 py-3 border-r border-gray-200 dark:border-gray-700 font-extrabold bg-green-50/60 dark:bg-green-900/20 text-green-800 dark:text-green-300 text-center text-xs leading-snug">
+                      <td className="px-2 py-3 border-r border-gray-200 dark:border-gray-700 font-extrabold bg-green-50/60 dark:bg-green-900/20 text-green-800 dark:text-green-300 text-center text-xs leading-snug" style={{minHeight: '60px'}}>
                         {getShortLabel(rowItem.nama)}
                       </td>
 
@@ -868,21 +874,25 @@ export default function TabelJadwalPage() {
                             }`}
                           >
                             {schedule ? (
-                              <div className="flex flex-col items-center justify-center space-y-1 py-0.5">
+                              <div className="flex flex-col items-center justify-center gap-0.5 py-1 min-h-[52px]">
                                 <span className="font-extrabold text-gray-900 dark:text-white text-xs text-center leading-snug line-clamp-2">
                                   {schedule.kegiatan}
                                 </span>
-                                {schedule.guru_id ? (
-                                  <span className="inline-flex items-center justify-center font-bold px-1.5 py-0.5 text-[9px] rounded-md bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-400 border border-green-200 dark:border-green-900/30">
-                                    {teacherCode}
+                                <div className="flex items-center gap-1 flex-wrap justify-center">
+                                  {schedule.guru_id ? (
+                                    <span className="inline-flex items-center justify-center font-bold px-1.5 py-0.5 text-[9px] rounded-md bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-400 border border-green-200 dark:border-green-900/30 whitespace-nowrap">
+                                      {teacherCode}
+                                    </span>
+                                  ) : null}
+                                  <span className="text-[8px] text-gray-400 font-medium flex items-center gap-0.5 whitespace-nowrap">
+                                    <Clock size={8} /> {schedule.jam_mulai.substring(0, 5)}
                                   </span>
-                                ) : null}
-                                <span className="text-[8px] text-gray-400 font-medium flex items-center gap-0.5 mt-0.5">
-                                  <Clock size={8} /> {schedule.jam_mulai.substring(0, 5)}
-                                </span>
+                                </div>
                               </div>
                             ) : (
-                              <span className="text-xs font-semibold text-gray-300 dark:text-gray-600">-</span>
+                              <div className="flex items-center justify-center min-h-[52px]">
+                                <span className="text-xs font-semibold text-gray-300 dark:text-gray-600">-</span>
+                              </div>
                             )}
                           </td>
                         );
@@ -905,19 +915,30 @@ export default function TabelJadwalPage() {
         {sortedGurus.length === 0 ? (
           <p className="text-gray-500 text-xs dark:text-gray-400">Belum ada data guru pengajar.</p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 text-xs">
-            {sortedGurus.map((g, idx) => {
-              const code = getTeacherCode(idx + 1);
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 text-xs">
+            {sortedGurus
+              .filter(g => {
+                // Only show teachers involved in the current active view
+                return activeRows.some(row =>
+                  DAYS.some(h => {
+                    const sch = getCellSchedule(h, row.id);
+                    return sch && sch.guru_id === g.id;
+                  })
+                );
+              })
+              .map((g) => {
+              const code = teacherCodeMap[g.id];
+              if (!code) return null;
               return (
                 <div
                   key={g.id}
-                  className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700/40 p-2 rounded-xl border border-gray-200/40 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700/80 transition-colors"
+                  className="flex items-center gap-2.5 bg-gray-50 dark:bg-gray-700/40 p-2.5 rounded-xl border border-gray-200/40 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700/80 transition-colors"
                 >
-                  <span className="flex items-center justify-center w-7 h-7 font-extrabold rounded-lg bg-green-500 text-white text-[10px] shadow-sm">
+                  <span className="flex items-center justify-center shrink-0 font-extrabold rounded-lg bg-green-500 text-white text-[10px] shadow-sm whitespace-nowrap px-2 h-7 min-w-[28px]">
                     {code}
                   </span>
-                  <div className="leading-tight truncate">
-                    <p className="font-bold text-gray-800 dark:text-gray-200 truncate">{g.nama}</p>
+                  <div className="leading-tight min-w-0">
+                    <p className="font-bold text-gray-800 dark:text-gray-200 truncate text-xs">{g.nama}</p>
                     <p className="text-[9px] text-gray-400 mt-0.5">ID: {g.id}</p>
                   </div>
                 </div>
