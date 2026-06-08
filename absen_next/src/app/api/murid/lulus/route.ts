@@ -38,9 +38,9 @@ export async function POST(request: Request) {
         const tahunKeluar = new Date().getFullYear();
 
         await connection.execute(
-          `INSERT INTO alumni (nama, nis, nik, no_hp, alamat, tahun_masuk, tahun_keluar, status_keluar, foto)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 'Lulus', ?)`,
-          [murid.nama, murid.nis || '', murid.nik || null, murid.no_hp || null, murid.alamat || null, tahunMasuk, tahunKeluar, murid.foto || null]
+          `INSERT INTO alumni (nama, nis, nik, no_hp, alamat, tahun_masuk, tahun_keluar, status_keluar, foto, jenis_kelamin)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'Lulus', ?, ?)`,
+          [murid.nama, murid.nis || '', murid.nik || null, murid.no_hp || null, murid.alamat || null, tahunMasuk, tahunKeluar, murid.foto || null, murid.jenis_kelamin || null]
         );
 
         await connection.execute('DELETE FROM users WHERE murid_id = ?', [murid.murid_id]);

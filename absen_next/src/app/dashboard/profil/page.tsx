@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { User, Camera, Save } from 'lucide-react';
+import { User, Camera, Save, Fingerprint } from 'lucide-react';
+import { startRegistration } from '@simplewebauthn/browser';
 
 export default function ProfilPage() {
   const [user, setUser] = useState<any>(null);
@@ -42,7 +43,6 @@ export default function ProfilPage() {
     if (!confirm('Apakah Anda yakin ingin membersihkan cache dan memuat ulang aplikasi? Ini akan memastikan Anda mendapatkan versi terbaru.')) return;
     
     try {
-      // Unregister Service Workers
       if ('serviceWorker' in navigator) {
         const registrations = await navigator.serviceWorker.getRegistrations();
         for (let registration of registrations) {
@@ -50,7 +50,6 @@ export default function ProfilPage() {
         }
       }
       
-      // Clear Cache Storage
       if ('caches' in window) {
         const cacheNames = await caches.keys();
         await Promise.all(cacheNames.map(name => caches.delete(name)));
@@ -60,6 +59,38 @@ export default function ProfilPage() {
       window.location.reload();
     } catch (e) {
       alert('Terjadi kesalahan saat membersihkan cache.');
+    }
+  };
+
+  const handleRegisterFingerprint = async () => {
+    try {
+      const resp = await fetch('/api/auth/webauthn/register/generate');
+      const options = await resp.json();
+      if (!resp.ok) throw new Error(options.error || 'Gagal menyiapkan data pendaftaran biometrik');
+
+      let regResp;
+      try {
+        regResp = await startRegistration(options);
+      } catch (err: any) {
+        throw new Error('Pendaftaran biometrik dibatalkan atau tidak didukung pada perangkat ini.');
+      }
+
+      const verifyResp = await fetch('/api/auth/webauthn/register/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(regResp),
+      });
+
+      const verification = await verifyResp.json();
+      if (verifyResp.ok && verification.verified) {
+        alert('Perangkat berhasil didaftarkan! Sekarang Anda dapat login menggunakan sidik jari/passkey.');
+        // Trigger event for sidebar to remove notification
+        window.dispatchEvent(new Event('fingerprint-registered'));
+      } else {
+        throw new Error(verification.error || 'Verifikasi pendaftaran gagal.');
+      }
+    } catch (err: any) {
+      alert(err.message);
     }
   };
 
@@ -143,6 +174,21 @@ export default function ProfilPage() {
                 </button>
               </div>
             </div>
+            
+            {/* Keamanan Tambahan: WebAuthn */}
+            {(user?.role === 'guru' || user?.role === 'wali_murid') && (
+              <div>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Biometrik (Sidik Jari / Passkey)</label>
+                <div className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-3 flex justify-between items-center">
+                  <span className="text-gray-600 dark:text-gray-300 font-medium text-sm flex items-center gap-2">
+                    <Fingerprint className="h-4 w-4" /> Login Cepat & Aman
+                  </span>
+                  <button onClick={handleRegisterFingerprint} className="text-green-700 dark:text-green-400 text-xs font-bold hover:underline bg-green-100 dark:bg-green-900/30 px-3 py-1.5 rounded-lg border border-green-200 dark:border-green-800 transition-colors">
+                    DAFTARKAN
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <form onSubmit={handleUpdateProfile} className="space-y-4 animate-[fadeIn_0.3s_ease-out]">

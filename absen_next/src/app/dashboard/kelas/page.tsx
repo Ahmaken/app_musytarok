@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { BookOpen, Search, Plus, Edit, Users, UserPlus, X } from 'lucide-react';
+import { BookOpen, Search, Plus, Edit, Users, UserPlus, X, FileText, Download } from 'lucide-react';
 
 export default function KelasPage() {
   const [activeTab, setActiveTab] = useState<'quran' | 'madin'>('quran');
@@ -66,6 +66,45 @@ export default function KelasPage() {
   const getSortIcon = (key: string) => {
     if (!sortConfig || sortConfig.key !== key) return ' ⇅';
     return sortConfig.direction === 'ascending' ? ' ▲' : ' ▼';
+  };
+
+  // Export State
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState('');
+
+  const handleExport = (format: 'pdf' | 'excel' = 'pdf', previewOnly = false) => {
+    if (sortedData.length === 0) {
+      alert('Tidak ada data untuk di-export.');
+      return;
+    }
+
+    const title = activeTab === 'quran' ? "DATA KELAS AL-QUR'AN" : 'DATA KELAS MADIN';
+    const subtitle = `Filter Pencarian: ${search || 'Semua Data'}`;
+    const filename = `Data_Kelas_${activeTab === 'quran' ? 'Quran' : 'Madin'}`;
+
+    const tableColumn = ["NO", "NAMA KELAS", "WALI KELAS", "JUMLAH SANTRI"];
+    const tableRows: any[] = [];
+
+    sortedData.forEach((item, idx) => {
+      tableRows.push([
+        idx + 1,
+        item.nama,
+        item.pembina || item.wali_kelas || '-',
+        item.jumlah_murid || '0'
+      ]);
+    });
+
+    if (format === 'excel') {
+      import('@/lib/exportUtils').then(({ exportToExcel }) => exportToExcel({ title, subtitle, columns: tableColumn, rows: tableRows, filename }));
+    } else {
+      import('@/lib/exportUtils').then(({ exportToPDF }) => {
+        const result = exportToPDF({ title, subtitle, columns: tableColumn, rows: tableRows, filename, previewOnly });
+        if (previewOnly && result) {
+          setPdfUrl(result);
+          setShowPdfPreview(true);
+        }
+      });
+    }
   };
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -275,17 +314,31 @@ export default function KelasPage() {
         </button>
       </div>
 
-      <div className="relative max-w-md">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Search size={16} className="text-gray-400" />
+      <div className="flex flex-col sm:flex-row gap-4 items-center">
+        <div className="relative flex-1 w-full">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search size={16} className="text-gray-400" />
+          </div>
+          <input 
+            type="text" 
+            placeholder={`Cari nama kelas ${activeTab}...`}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 dark:text-gray-200 transition-colors"
+          />
         </div>
-        <input 
-          type="text" 
-          placeholder="Cari nama kelas..." 
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 dark:text-gray-200 transition-colors"
-        />
+
+        <div className="flex gap-2 shrink-0 ml-auto sm:ml-0 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0">
+          <button onClick={() => handleExport('pdf', true)} className="px-3 py-2.5 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-xl text-xs font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-1.5 shrink-0" title="Preview PDF">
+            <FileText size={14} /> Preview
+          </button>
+          <button onClick={() => handleExport('pdf', false)} className="px-3 py-2.5 bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors flex items-center gap-1.5 shrink-0" title="Export PDF">
+            <Download size={14} /> PDF
+          </button>
+          <button onClick={() => handleExport('excel', false)} className="px-3 py-2.5 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800 rounded-xl text-xs font-bold hover:bg-green-100 transition-colors flex items-center gap-1.5 shrink-0" title="Export Excel">
+            <Download size={14} /> Excel
+          </button>
+        </div>
       </div>
 
       {/* Tabel */}
@@ -569,6 +622,70 @@ export default function KelasPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Preview Modal */}
+      {showPdfPreview && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-5xl h-[85vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-[slideUp_0.3s_ease-out]">
+            <div className="flex justify-between items-center p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+              <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                <FileText className="text-teal-500" size={20} />
+                Preview PDF Data Kelas
+              </h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleExport('pdf', false)}
+                  className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-xl text-sm transition-colors flex items-center gap-2"
+                >
+                  <Download size={16} /> Download
+                </button>
+                <button
+                  onClick={() => setShowPdfPreview(false)}
+                  className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 p-2 rounded-xl transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            {/* Desktop: iframe preview */}
+            <div className="hidden md:block flex-1 bg-gray-200 dark:bg-black/50 p-4 h-full">
+              <iframe 
+                src={pdfUrl} 
+                className="w-full h-full rounded-xl shadow-inner bg-white"
+                title="PDF Preview"
+                style={{ minHeight: '60vh' }}
+              />
+            </div>
+            {/* Mobile: fallback card */}
+            <div className="flex md:hidden flex-1 flex-col items-center justify-center gap-5 p-8 bg-gray-50 dark:bg-gray-900/50">
+              <div className="w-20 h-20 bg-teal-100 dark:bg-teal-900/40 rounded-full flex items-center justify-center">
+                <FileText size={40} className="text-teal-500" />
+              </div>
+              <div className="text-center">
+                <p className="font-bold text-gray-700 dark:text-gray-200 mb-1">Preview PDF tidak tersedia di HP</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Browser HP tidak mendukung tampilan PDF dalam aplikasi. Gunakan tombol di bawah untuk membuka atau mengunduh file PDF.</p>
+              </div>
+              <div className="flex flex-col gap-3 w-full max-w-xs">
+                <a
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl shadow-md transition-colors"
+                >
+                  <FileText size={18} /> Buka di Tab Baru
+                </a>
+                <a
+                  href={pdfUrl}
+                  download
+                  className="flex items-center justify-center gap-2 w-full py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold rounded-2xl transition-colors"
+                >
+                  <Download size={18} /> Unduh PDF
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       )}

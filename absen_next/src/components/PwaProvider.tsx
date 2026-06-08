@@ -10,16 +10,14 @@ export default function PwaProvider({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then(
-          (registration) => {
-            console.log('Service Worker registration successful with scope: ', registration.scope);
-          },
-          (err) => {
-            console.log('Service Worker registration failed: ', err);
-          }
-        );
-      });
+      navigator.serviceWorker.register('/sw.js').then(
+        (registration) => {
+          console.log('Service Worker registration successful with scope: ', registration.scope);
+        },
+        (err) => {
+          console.log('Service Worker registration failed: ', err);
+        }
+      );
     }
 
     // Check if we need to ask for push notification permissions
@@ -32,7 +30,11 @@ export default function PwaProvider({ children }: { children: React.ReactNode })
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      setIsInstallable(true);
+      if (localStorage.getItem('pwa_prompt_closed') !== 'true') {
+        setIsInstallable(true);
+      }
+      (window as any).deferredPrompt = e;
+      window.dispatchEvent(new CustomEvent('pwa-available'));
     };
 
     const handleAppInstalled = () => {
@@ -113,14 +115,17 @@ export default function PwaProvider({ children }: { children: React.ReactNode })
 
       {/* PWA Install Button (Draggable & Minimizable) */}
       {isInstallable && (
-        <DraggableInstallButton onInstall={handleInstallClick} />
+        <DraggableInstallButton 
+          onInstall={handleInstallClick} 
+          onClose={() => setIsInstallable(false)} 
+        />
       )}
     </>
   );
 }
 
 // Komponen Pembantu untuk Tombol Install yang bisa didrag
-function DraggableInstallButton({ onInstall }: { onInstall: () => void }) {
+function DraggableInstallButton({ onInstall, onClose }: { onInstall: () => void, onClose: () => void }) {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isMounted, setIsMounted] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -183,24 +188,29 @@ function DraggableInstallButton({ onInstall }: { onInstall: () => void }) {
       className="cursor-move animate-[slideUp_0.5s_ease-out]"
     >
       <div className="flex flex-col items-end gap-1">
-        {/* Tombol Minimize/Maximize (Kecil) */}
+        {/* Tombol Tutup (X) */}
         <button 
-          onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }}
+          onClick={(e) => { 
+            e.stopPropagation(); 
+            localStorage.setItem('pwa_prompt_closed', 'true');
+            window.dispatchEvent(new CustomEvent('pwa-closed'));
+            onClose();
+          }}
           className="bg-gray-800/80 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-md border border-white/20 hover:bg-gray-700 pointer-events-auto"
         >
-          {isMinimized ? '+' : '-'}
+          X
         </button>
         
         {/* Tombol Install Utama */}
         <button
           onClick={(e) => { e.stopPropagation(); if (!isDragging) onInstall(); }}
           className={`flex items-center gap-2 bg-gradient-to-r from-green-700 to-green-900 text-white rounded-full shadow-2xl transition-all border border-white/20 font-medium group pointer-events-auto
-            ${isMinimized ? 'p-3' : 'px-5 py-3'}
+            px-5 py-3
             ${isDragging ? 'scale-110 shadow-green-900/50' : 'hover:-translate-y-1 hover:shadow-green-900/50'}
           `}
         >
-          <Download size={20} className={!isMinimized ? "group-hover:animate-bounce" : ""} />
-          {!isMinimized && <span className="whitespace-nowrap select-none">Install App</span>}
+          <Download size={20} className="group-hover:animate-bounce" />
+          <span className="whitespace-nowrap select-none">Install App</span>
         </button>
       </div>
     </div>

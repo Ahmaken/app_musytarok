@@ -1,14 +1,37 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Users, Search, Plus, Filter, User, MapPin, CheckSquare, Edit, UserPlus, Camera, RefreshCw } from 'lucide-react';
+import { Users, Search, Plus, Filter, User, MapPin, CheckSquare, Edit, UserPlus, Camera, RefreshCw, FileText, Download, X } from 'lucide-react';
+import { exportToPDF, exportToExcel } from '@/lib/exportUtils';
 import Link from 'next/link';
+
+// ====== Avatar Lokal (tanpa service eksternal) ======
+const AVATAR_COLORS = [
+  '#2563eb', '#16a34a', '#9333ea', '#dc2626', '#ea580c',
+  '#0891b2', '#65a30d', '#7c3aed', '#db2777', '#059669',
+  '#b45309', '#0284c7', '#be123c', '#4f46e5', '#0f766e',
+];
+const getInitials = (nama: string): string => {
+  if (!nama) return '?';
+  const words = nama.trim().split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+  return nama.substring(0, 2).toUpperCase();
+};
+const getAvatarColor = (nama: string): string => {
+  if (!nama) return AVATAR_COLORS[0];
+  let hash = 0;
+  for (let i = 0; i < nama.length; i++) {
+    hash = nama.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+};
 
 export default function DataMuridPage() {
   const [murid, setMurid] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [role, setRole] = useState('murid');
+  const [userAsrama, setUserAsrama] = useState<string | null>(null);
 
   // State untuk bulk actions
   const [selectedMurid, setSelectedMurid] = useState<number[]>([]);
@@ -35,22 +58,22 @@ export default function DataMuridPage() {
     if (fotoName.startsWith('http://') || fotoName.startsWith('https://')) {
       return fotoName;
     }
-    // File dari API Mitra yang diawali "Berkas_"
-    if (fotoName.startsWith('Berkas_')) {
-      const baseUrl = process.env.NEXT_PUBLIC_API_MITRA_FOTO_URL || 'https://mawar.smartpesantren.id/sekretariat/berkas/';
-      const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
-      return `${cleanBaseUrl}${fotoName}`;
+    
+    // File lokal yang di-upload dari sistem kita sendiri
+    if (fotoName.startsWith('foto_') || fotoName.startsWith('upload_') || fotoName.startsWith('profil_')) {
+      return `/uploads/${fotoName}`;
     }
-    // Coba deteksi dari ekstensi file: jika nama terlihat seperti file foto dari mitra (ada ekstensi gambar tapi bukan nama file lokal biasa)
-    const lowerName = fotoName.toLowerCase();
-    const hasImageExt = /\.(jpg|jpeg|png|gif|webp)$/i.test(fotoName);
-    // Jika ada ekstensi gambar dan nama filenya panjang (kemungkinan dari mitra), coba server mitra
-    if (hasImageExt && fotoName.length > 20 && !fotoName.startsWith('foto_') && !fotoName.startsWith('upload_')) {
-      const baseUrl = process.env.NEXT_PUBLIC_API_MITRA_FOTO_URL || 'https://mawar.smartpesantren.id/sekretariat/berkas/';
-      const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
-      return `${cleanBaseUrl}${fotoName}`;
+
+    // Gunakan environment variable jika tersedia, fallback ke default path
+    const baseUrl = process.env.NEXT_PUBLIC_API_MITRA_FOTO_URL || 'https://mawar.smartpesantren.id/sekretariat/berkas/';
+    const cleanFotoName = fotoName.startsWith('/') ? fotoName.substring(1) : fotoName;
+    
+    // Jika fotoName sudah mengandung 'sekretariat/berkas', jangan tambahkan lagi
+    if (cleanFotoName.includes('sekretariat/berkas')) {
+      return `https://mawar.smartpesantren.id/${cleanFotoName}`;
     }
-    return `/uploads/${fotoName}`;
+    
+    return `${baseUrl}${cleanFotoName}`;
   };
 
 
@@ -60,21 +83,52 @@ export default function DataMuridPage() {
   const [filterQuran, setFilterQuran] = useState('');
   const [filterKamar, setFilterKamar] = useState('');
   const [showAll, setShowAll] = useState(false);
+  const [allMadin, setAllMadin] = useState<any[]>([]);
+  const [allQuran, setAllQuran] = useState<any[]>([]);
+  const [allKamar, setAllKamar] = useState<any[]>([]);
+
+  // Export State
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState('');
 
   // State untuk sinkronisasi API Mitra
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<any>(null);
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
 
+  const fetchFilters = async () => {
+    try {
+      const [resMadin, resQuran, resKamar] = await Promise.all([
+        fetch('/api/kelas?type=madin'),
+        fetch('/api/kelas?type=quran'),
+        fetch('/api/kelas?type=kamar')
+      ]);
+      const [jsonMadin, jsonQuran, jsonKamar] = await Promise.all([
+        resMadin.json(),
+        resQuran.json(),
+        resKamar.json()
+      ]);
+      if (jsonMadin.success) setAllMadin(jsonMadin.data);
+      if (jsonQuran.success) setAllQuran(jsonQuran.data);
+      if (jsonKamar.success) setAllKamar(jsonKamar.data);
+    } catch (err) {
+      console.error('Failed to fetch filter options:', err);
+    }
+  };
+
   useEffect(() => {
     const fetchMe = async () => {
       try {
         const res = await fetch('/api/auth/me');
         const data = await res.json();
-        if (data.success) setRole(data.user.role);
+        if (data.success) {
+          setRole(data.user.role);
+          setUserAsrama(data.user.namaAsrama || null);
+        }
       } catch (err) { }
     };
     fetchMe();
+    fetchFilters();
 
     const fetchData = async () => {
       setLoading(true);
@@ -239,10 +293,6 @@ export default function DataMuridPage() {
     }
   };
 
-  const madinList = Array.from(new Set(murid.map(m => m.kelas_madin).filter(Boolean))).sort() as string[];
-  const quranList = Array.from(new Set(murid.map(m => m.kelas_quran).filter(Boolean))).sort() as string[];
-  const kamarList = Array.from(new Set(murid.map(m => m.nama_kamar).filter(Boolean))).sort() as string[];
-
   const filteredMurid = murid.filter(m => {
     const s = search.toLowerCase();
     const matchSearch = m.nama.toLowerCase().includes(s) ||
@@ -252,9 +302,41 @@ export default function DataMuridPage() {
       (m.nama_kamar && m.nama_kamar.toLowerCase().includes(s)) ||
       (m.alamat && m.alamat.toLowerCase().includes(s));
 
-    const matchMadin = filterMadin ? m.kelas_madin === filterMadin : true;
-    const matchQuran = filterQuran ? m.kelas_quran === filterQuran : true;
-    const matchKamar = filterKamar ? m.nama_kamar === filterKamar : true;
+    // Tentukan batasan gender jika role adalah pengurus_asrama
+    let genderConstraint: string | null = null;
+    if (role === 'pengurus_asrama' && userAsrama) {
+      const asr = userAsrama.toLowerCase();
+      if (asr.includes('asrama a') || asr === 'a') {
+        genderConstraint = 'Laki-laki';
+      } else if (
+        asr.includes('asrama b') ||
+        asr.includes('asrama c') ||
+        asr.includes('asrama d') ||
+        asr.includes('asrama e') ||
+        asr.includes('asrama f') ||
+        ['b', 'c', 'd', 'e', 'f'].includes(asr.trim())
+      ) {
+        genderConstraint = 'Perempuan';
+      }
+    }
+
+    const matchMadin = filterMadin
+      ? (filterMadin === '__none__' 
+          ? ((!m.kelas_madin || m.kelas_madin === '-') && (!genderConstraint || m.jenis_kelamin === genderConstraint)) 
+          : m.kelas_madin === filterMadin)
+      : true;
+
+    const matchQuran = filterQuran
+      ? (filterQuran === '__none__' 
+          ? ((!m.kelas_quran || m.kelas_quran === '-') && (!genderConstraint || m.jenis_kelamin === genderConstraint)) 
+          : m.kelas_quran === filterQuran)
+      : true;
+
+    const matchKamar = filterKamar
+      ? (filterKamar === '__none__' 
+          ? ((!m.nama_kamar || m.nama_kamar === '-') && (!genderConstraint || m.jenis_kelamin === genderConstraint)) 
+          : m.nama_kamar === filterKamar)
+      : true;
 
     return matchSearch && matchMadin && matchQuran && matchKamar;
   });
@@ -269,6 +351,14 @@ export default function DataMuridPage() {
     setSortConfig({ key, direction });
   };
 
+  // Helper: normalisasi nilai sort agar tanda baca (titik, koma, dll) tidak mempengaruhi urutan
+  // Contoh: "A. EMIL" → "A EMIL" sehingga tetap diurutkan sebelum "ALFIANNUR"
+  const normalizeSortKey = (val: string): string =>
+    val
+      .replace(/[^\w\s]/g, ' ') // ganti semua tanda baca (non-alphanumeric, non-space) dengan spasi
+      .replace(/\s+/g, ' ')     // hilangkan spasi ganda hasil penggantian
+      .trim();
+
   const sortedMurid = [...filteredMurid].sort((a, b) => {
     if (!sortConfig) return 0;
     let valA = a[sortConfig.key];
@@ -276,8 +366,12 @@ export default function DataMuridPage() {
     if (valA === null || valA === undefined) valA = '';
     if (valB === null || valB === undefined) valB = '';
 
+    // Normalisasi dulu (khusus kolom teks) agar tanda baca tidak mengacaukan urutan
+    const strA = normalizeSortKey(valA.toString());
+    const strB = normalizeSortKey(valB.toString());
+
     // Gunakan numeric localeCompare untuk natural sort
-    const compareResult = valA.toString().localeCompare(valB.toString(), undefined, { numeric: true, sensitivity: 'base' });
+    const compareResult = strA.localeCompare(strB, 'id', { numeric: true, sensitivity: 'base' });
     return sortConfig.direction === 'ascending' ? compareResult : -compareResult;
   });
 
@@ -299,6 +393,46 @@ export default function DataMuridPage() {
       setSelectedMurid(selectedMurid.filter(m => m !== id));
     } else {
       setSelectedMurid([...selectedMurid, id]);
+    }
+  };
+
+  const handleExport = (format: 'pdf' | 'excel' = 'pdf', previewOnly = false) => {
+    const exportData = selectedMurid.length > 0 
+      ? sortedMurid.filter(m => selectedMurid.includes(m.murid_id))
+      : sortedMurid;
+
+    if (exportData.length === 0) {
+      alert('Tidak ada data untuk di-export.');
+      return;
+    }
+
+    const title = 'DATA SANTRI';
+    const subtitle = `Filter: ${filterMadin || 'Semua Madin'} | ${filterQuran || "Semua Qur'an"} | ${filterKamar || 'Semua Kamar'}`;
+    const filename = `Data_Santri`;
+
+    const tableColumn = ["NO", "NIS", "NAMA LENGKAP", "J. KELAMIN", "KELAS MADIN", "KELAS QUR'AN", "KAMAR"];
+    const tableRows: any[] = [];
+
+    exportData.forEach((item, idx) => {
+      tableRows.push([
+        idx + 1,
+        item.nis || '-',
+        item.nama,
+        item.jenis_kelamin || '-',
+        item.kelas_madin || '-',
+        item.kelas_quran || '-',
+        item.nama_kamar || '-'
+      ]);
+    });
+
+    if (format === 'excel') {
+      exportToExcel({ title, subtitle, columns: tableColumn, rows: tableRows, filename });
+    } else {
+      const result = exportToPDF({ title, subtitle, columns: tableColumn, rows: tableRows, filename, previewOnly });
+      if (previewOnly && result) {
+        setPdfUrl(result);
+        setShowPdfPreview(true);
+      }
     }
   };
 
@@ -364,7 +498,10 @@ export default function DataMuridPage() {
         // Refresh data murid di tabel
         const refreshRes = await fetch('/api/murid');
         const refreshJson = await refreshRes.json();
-        if (refreshJson.success) setMurid(refreshJson.data);
+        if (refreshJson.success) {
+          setMurid(refreshJson.data);
+          fetchFilters();
+        }
       } else {
         alert('Gagal sinkronisasi: ' + (data.error || data.message || 'Terjadi kesalahan'));
       }
@@ -454,8 +591,20 @@ export default function DataMuridPage() {
         )}
 
         <button onClick={() => setShowFilters(!showFilters)} className={`px-3 py-2.5 border rounded-xl flex items-center justify-center transition-colors shrink-0 ${showFilters || filterMadin || filterQuran || filterKamar ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
-          <Filter size={18} />
+          <Filter size={18} /> <span className="ml-2 text-xs font-bold sm:hidden">Filter</span>
         </button>
+
+        <div className="flex gap-2 shrink-0 ml-auto sm:ml-0">
+          <button onClick={() => handleExport('pdf', true)} className="px-3 py-2.5 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-xl text-xs font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-1.5" title="Preview PDF">
+            <FileText size={14} /> Preview
+          </button>
+          <button onClick={() => handleExport('pdf', false)} className="px-3 py-2.5 bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors flex items-center gap-1.5" title="Export PDF">
+            <Download size={14} /> PDF
+          </button>
+          <button onClick={() => handleExport('excel', false)} className="px-3 py-2.5 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800 rounded-xl text-xs font-bold hover:bg-green-100 transition-colors flex items-center gap-1.5" title="Export Excel">
+            <Download size={14} /> Excel
+          </button>
+        </div>
       </div>
 
       {/* Filter Panel */}
@@ -465,21 +614,24 @@ export default function DataMuridPage() {
             <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Kelas Madin</label>
             <select value={filterMadin} onChange={(e) => setFilterMadin(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-teal-500">
               <option value="">Semua Madin</option>
-              {madinList.map(k => <option key={k} value={k}>{k}</option>)}
+              <option value="__none__">Belum ada data kelas madin</option>
+              {allMadin.map(k => <option key={k.id} value={k.nama}>{k.nama}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Kelas Qur'an</label>
             <select value={filterQuran} onChange={(e) => setFilterQuran(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500">
               <option value="">Semua Qur'an</option>
-              {quranList.map(k => <option key={k} value={k}>{k}</option>)}
+              <option value="__none__">Belum ada data kelas qur'an</option>
+              {allQuran.map(k => <option key={k.id} value={k.nama}>{k.nama}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Kamar Asrama</label>
             <select value={filterKamar} onChange={(e) => setFilterKamar(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-orange-500">
               <option value="">Semua Kamar</option>
-              {kamarList.map(k => <option key={k} value={k}>{k}</option>)}
+              <option value="__none__">Belum ada data kamar</option>
+              {allKamar.map(k => <option key={k.id} value={k.nama}>{k.nama}</option>)}
             </select>
           </div>
         </div>
@@ -503,6 +655,7 @@ export default function DataMuridPage() {
                 )}
                 <th className="px-4 py-4 w-12 text-center">FOTO</th>
                 <th className="px-4 py-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none" onClick={() => requestSort('nama')}>SANTRI & NIS{getSortIcon('nama')}</th>
+                <th className="px-4 py-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none" onClick={() => requestSort('jenis_kelamin')}>J. KELAMIN{getSortIcon('jenis_kelamin')}</th>
                 <th className="px-4 py-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none" onClick={() => requestSort('kelas_madin')}>KELAS & KAMAR{getSortIcon('kelas_madin')}</th>
                 <th className="px-4 py-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none" onClick={() => requestSort('alamat')}>ALAMAT{getSortIcon('alamat')}</th>
                 <th className="px-4 py-4 text-center">AKSI</th>
@@ -541,34 +694,33 @@ export default function DataMuridPage() {
                     )}
                     <td className="px-4 py-3 text-center">
                       <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto overflow-hidden bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 ${item.foto ? 'cursor-pointer hover:opacity-80' : ''} relative group`}
-                        onClick={() => item.foto ? setZoomPhoto(getFotoUrl(item.foto)) : null}
+                        className={`w-10 h-10 rounded-full mx-auto overflow-hidden relative ${item.foto && item.foto !== '-' ? 'cursor-pointer hover:opacity-80' : ''}`}
+                        onClick={() => item.foto && item.foto !== '-' ? setZoomPhoto(getFotoUrl(item.foto)) : null}
                       >
-                        {item.foto ? (
+                        {/* Avatar inisial lokal — selalu tampil sebagai lapisan dasar */}
+                        <div
+                          className="absolute inset-0 flex items-center justify-center"
+                          style={{ backgroundColor: getAvatarColor(item.nama) }}
+                        >
+                          <span className="text-white text-xs font-bold leading-none">{getInitials(item.nama)}</span>
+                        </div>
+                        {/* Jika ada foto, overlay di atas avatar inisial */}
+                        {item.foto && item.foto !== '-' && (
                           <img
                             src={getFotoUrl(item.foto)}
                             alt={item.nama}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.currentTarget;
-                              target.style.display = 'none';
-                              const parent = target.parentElement;
-                              if (parent && !parent.querySelector('.fallback-icon')) {
-                                const icon = document.createElement('div');
-                                icon.className = 'fallback-icon flex items-center justify-center w-full h-full';
-                                icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
-                                parent.appendChild(icon);
-                              }
-                            }}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            onError={(e) => { e.currentTarget.style.opacity = '0'; e.currentTarget.style.display = 'none'; e.currentTarget.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; }}
                           />
-                        ) : (
-                          <User size={20} />
                         )}
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="font-bold text-gray-900 dark:text-white">{item.nama}</div>
                       <div className="font-mono text-xs text-gray-500">{item.nis || '-'}</div>
+                    </td>
+                    <td className="px-4 py-3 text-xs uppercase font-medium">
+                      {item.jenis_kelamin || '-'}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
@@ -654,7 +806,7 @@ export default function DataMuridPage() {
                 <button
                   type="submit"
                   disabled={savingBulk || !bulkTargetId}
-                  className={`flex-1 py-2 text-white font-bold rounded-xl transition-colors disabled:opacity-50 ${bulkType === 'madin' ? 'bg-teal-600 hover:bg-teal-700' : bulkType === 'quran' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-orange-600 hover:bg-orange-700'}`}
+                  className={`flex-1 py-2 text-white font-bold rounded-xl transition-colors disabled:opacity-50 ${bulkType === 'madin' ? 'bg-teal-600 hover:bg-teal-700' : bulkType === 'quran' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-orange-600 hover:bg-orange-600'}`}
                 >
                   {savingBulk ? 'Memproses...' : 'Pindahkan'}
                 </button>
@@ -671,13 +823,24 @@ export default function DataMuridPage() {
             <div className="bg-blue-600 dark:bg-blue-900 p-5 text-white flex justify-between items-start shrink-0">
               <div className="flex gap-4 items-center">
                 <div
-                  className="w-16 h-16 rounded-full overflow-hidden border-2 border-white/30 bg-white/10 flex items-center justify-center cursor-pointer hover:opacity-80"
-                  onClick={() => viewingMurid.foto ? setZoomPhoto(getFotoUrl(viewingMurid.foto)) : null}
+                  className="w-16 h-16 rounded-full overflow-hidden border-2 border-white/30 bg-white/10 flex items-center justify-center cursor-pointer hover:opacity-80 relative"
+                  onClick={() => viewingMurid.foto && viewingMurid.foto !== '-' ? setZoomPhoto(getFotoUrl(viewingMurid.foto)) : null}
                 >
-                  {viewingMurid.foto ? (
-                    <img src={getFotoUrl(viewingMurid.foto)} alt={viewingMurid.nama} className="w-full h-full object-cover" />
-                  ) : (
-                    <User size={32} className="text-white/70" />
+                  {/* Avatar inisial lokal sebagai lapisan dasar */}
+                  <div
+                    className="absolute inset-0 flex items-center justify-center"
+                    style={{ backgroundColor: getAvatarColor(viewingMurid.nama) }}
+                  >
+                    <span className="text-white text-2xl font-bold">{getInitials(viewingMurid.nama)}</span>
+                  </div>
+                  {/* Foto asli overlay di atas avatar inisial */}
+                  {viewingMurid.foto && viewingMurid.foto !== '-' && (
+                    <img
+                      src={getFotoUrl(viewingMurid.foto)}
+                      alt={viewingMurid.nama}
+                      className="absolute inset-0 w-full h-full object-cover"
+                      onError={(e) => { e.currentTarget.style.opacity = '0'; e.currentTarget.style.display = 'none'; e.currentTarget.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; }}
+                    />
                   )}
                 </div>
                 <div>
@@ -764,13 +927,24 @@ export default function DataMuridPage() {
               <div className="flex flex-col sm:flex-row gap-5">
                 <div className="w-full sm:w-1/3 space-y-3">
                   <div className="w-32 h-32 bg-gray-100 dark:bg-gray-900 rounded-2xl mx-auto overflow-hidden border-2 border-dashed border-gray-300 flex items-center justify-center relative">
+                    {/* Avatar inisial lokal sebagai lapisan dasar */}
+                    <div
+                      className="absolute inset-0 flex items-center justify-center"
+                      style={{ backgroundColor: getAvatarColor(editingMurid.nama) }}
+                    >
+                      <span className="text-gray-700 dark:text-gray-200 text-2xl font-bold opacity-30">{getInitials(editingMurid.nama)}</span>
+                    </div>
+                    {/* Preview foto baru jika ada */}
                     {photoFile ? (
-                      <img src={URL.createObjectURL(photoFile)} alt="Preview" className="w-full h-full object-cover" />
-                    ) : editingMurid.foto ? (
-                      <img src={getFotoUrl(editingMurid.foto)} alt={editingMurid.nama} className="w-full h-full object-cover" />
-                    ) : (
-                      <User size={40} className="text-gray-400" />
-                    )}
+                      <img src={URL.createObjectURL(photoFile)} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
+                    ) : editingMurid.foto && editingMurid.foto !== '-' ? (
+                      <img
+                        src={getFotoUrl(editingMurid.foto)}
+                        alt={editingMurid.nama}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        onError={(e) => { e.currentTarget.style.opacity = '0'; e.currentTarget.style.display = 'none'; e.currentTarget.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; }}
+                      />
+                    ) : null}
                     <label className="absolute bottom-2 bg-black/60 text-white text-[10px] px-3 py-1 rounded-full cursor-pointer hover:bg-black transition-colors">
                       Ubah Foto
                       <input type="file" className="hidden" accept="image/*" onChange={(e) => setPhotoFile(e.target.files?.[0] || null)} />
@@ -856,6 +1030,19 @@ export default function DataMuridPage() {
               </div>
 
               <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1">Jenis Kelamin</label>
+                <select
+                  value={editingMurid.jenis_kelamin || ''}
+                  onChange={(e) => setEditingMurid({ ...editingMurid, jenis_kelamin: e.target.value })}
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">Pilih...</option>
+                  <option value="Laki-laki">Laki-laki</option>
+                  <option value="Perempuan">Perempuan</option>
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-xs font-bold text-gray-500 mb-1">Alamat Lengkap</label>
                 <textarea
                   value={editingMurid.alamat || ''}
@@ -912,6 +1099,70 @@ export default function DataMuridPage() {
           <div className="relative max-w-4xl max-h-[90vh] flex items-center justify-center animate-in zoom-in duration-200">
             <img src={zoomPhoto} alt="Zoomed" className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl" />
             <button className="absolute -top-4 -right-4 bg-white text-black rounded-full w-8 h-8 flex items-center justify-center font-bold hover:scale-110 transition-transform">X</button>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Preview Modal */}
+      {showPdfPreview && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-5xl h-[85vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-[slideUp_0.3s_ease-out]">
+            <div className="flex justify-between items-center p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+              <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                <FileText className="text-blue-500" size={20} />
+                Preview PDF Data Santri
+              </h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleExport('pdf', false)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-xl text-sm transition-colors flex items-center gap-2"
+                >
+                  <Download size={16} /> Download
+                </button>
+                <button
+                  onClick={() => setShowPdfPreview(false)}
+                  className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 p-2 rounded-xl transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            {/* Desktop: iframe preview */}
+            <div className="hidden md:block flex-1 bg-gray-200 dark:bg-black/50 p-4 h-full">
+              <iframe 
+                src={pdfUrl} 
+                className="w-full h-full rounded-xl shadow-inner bg-white"
+                title="PDF Preview"
+                style={{ minHeight: '60vh' }}
+              />
+            </div>
+            {/* Mobile: fallback card */}
+            <div className="flex md:hidden flex-1 flex-col items-center justify-center gap-5 p-8 bg-gray-50 dark:bg-gray-900/50">
+              <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center">
+                <FileText size={40} className="text-blue-500" />
+              </div>
+              <div className="text-center">
+                <p className="font-bold text-gray-700 dark:text-gray-200 mb-1">Preview PDF tidak tersedia di HP</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Browser HP tidak mendukung tampilan PDF dalam aplikasi. Gunakan tombol di bawah untuk membuka atau mengunduh file PDF.</p>
+              </div>
+              <div className="flex flex-col gap-3 w-full max-w-xs">
+                <a
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-md transition-colors"
+                >
+                  <FileText size={18} /> Buka di Tab Baru
+                </a>
+                <a
+                  href={pdfUrl}
+                  download
+                  className="flex items-center justify-center gap-2 w-full py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold rounded-2xl transition-colors"
+                >
+                  <Download size={18} /> Unduh PDF
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { FileText, Clock, CalendarDays, Download, Filter, User, BookOpen, AlertCircle, ArrowRight, Search, Eye, X } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { exportToPDF, exportToExcel } from '@/lib/exportUtils';
 
 export default function RekapitulasiPage() {
   const [role, setRole] = useState('guru');
@@ -115,25 +116,17 @@ export default function RekapitulasiPage() {
     return 0;
   });
 
-  const handleExport = (previewOnly = false) => {
-    const exportData = sortedData.filter(d => selectedIds.includes(d.id));
+  const handleExport = (format: 'pdf' | 'excel' = 'pdf', previewOnly = false) => {
+    // Jika ada yang di-checklist, gunakan yang di-checklist. Jika tidak ada, gunakan semua data yang tampil.
+    const exportData = selectedIds.length > 0 
+      ? sortedData.filter(d => selectedIds.includes(d.id))
+      : sortedData;
 
     if (exportData.length === 0) {
-      alert('Pilih setidaknya 1 data untuk di-export/preview.');
+      alert('Tidak ada data untuk di-export.');
       return;
     }
 
-    const doc = new jsPDF();
-    
-    // Header
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.text('REKAPITULASI KEHADIRAN', 105, 20, { align: 'center' });
-    
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'normal');
-    
-    // Info
     let tipeText = '';
     if (filter.tipe === 'madin') tipeText = 'Absensi Madin';
     else if (filter.tipe === 'quran') tipeText = "Absensi Al-Qur'an";
@@ -142,11 +135,11 @@ export default function RekapitulasiPage() {
     
     const targetName = options.find(o => o.id.toString() === filter.target_id)?.nama || (filter.target_id === 'all' ? 'Semua Guru' : '-');
     
-    doc.text(`Tipe: ${tipeText}`, 14, 30);
-    doc.text(`${filter.tipe === 'guru' ? 'Guru' : 'Kelas/Kamar'}: ${targetName}`, 14, 36);
-    doc.text(`Periode: ${months[parseInt(filter.bulan) - 1]} ${filter.tahun}`, 14, 42);
+    const title = 'REKAPITULASI KEHADIRAN';
+    const subtitle = `Tipe: ${tipeText}\n${filter.tipe === 'guru' ? 'Guru' : 'Kelas/Kamar'}: ${targetName}`;
+    const period = `${months[parseInt(filter.bulan) - 1]} ${filter.tahun}`;
+    const filename = `Rekap_${tipeText.replace(/[^a-zA-Z0-9]/g, '')}_${months[parseInt(filter.bulan) - 1]}_${filter.tahun}`;
 
-    // Table
     const tableColumn = ["No", "Nama Lengkap", "Identifier", "Hadir", "Izin", "Sakit", "Alpha", "% Kehadiran"];
     const tableRows: any[] = [];
 
@@ -166,21 +159,14 @@ export default function RekapitulasiPage() {
       ]);
     });
 
-    autoTable(doc, {
-      head: [tableColumn],
-      body: tableRows,
-      startY: 48,
-      theme: 'grid',
-      styles: { fontSize: 9, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.1 },
-      headStyles: { fillColor: [255, 255, 255], fontStyle: 'bold' } // Formal white design
-    });
-
-    if (previewOnly) {
-      const blobURL = doc.output('bloburl');
-      setPdfUrl(blobURL.toString());
-      setShowPdfPreview(true);
+    if (format === 'excel') {
+      exportToExcel({ title, subtitle, period, columns: tableColumn, rows: tableRows, filename });
     } else {
-      doc.save(`Rekap_${tipeText.replace(/[^a-zA-Z0-9]/g, '')}_${months[parseInt(filter.bulan) - 1]}_${filter.tahun}.pdf`);
+      const result = exportToPDF({ title, subtitle, period, columns: tableColumn, rows: tableRows, filename, previewOnly });
+      if (previewOnly && result) {
+        setPdfUrl(result);
+        setShowPdfPreview(true);
+      }
     }
   };
 
@@ -254,16 +240,22 @@ export default function RekapitulasiPage() {
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
             <button
-              onClick={() => handleExport(true)}
-              className="flex items-center gap-2 bg-white/50 hover:bg-white dark:bg-black/20 dark:hover:bg-black/40 text-purple-800 dark:text-purple-200 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm backdrop-blur-sm w-fit"
+              onClick={() => handleExport('pdf', true)}
+              className="flex items-center gap-2 bg-white/50 hover:bg-white dark:bg-black/20 dark:hover:bg-black/40 text-purple-800 dark:text-purple-200 px-4 py-2.5 rounded-xl font-bold transition-all shadow-sm backdrop-blur-sm w-fit text-sm"
             >
-              <FileText size={18} /> Preview PDF
+              <FileText size={16} /> Preview PDF
             </button>
             <button
-              onClick={() => handleExport(false)}
-              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md shadow-purple-600/20 backdrop-blur-sm w-fit"
+              onClick={() => handleExport('pdf', false)}
+              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-xl font-bold transition-all shadow-md shadow-purple-600/20 backdrop-blur-sm w-fit text-sm"
             >
-              <Download size={18} /> Export Laporan
+              <Download size={16} /> PDF
+            </button>
+            <button
+              onClick={() => handleExport('excel', false)}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-xl font-bold transition-all shadow-md shadow-green-600/20 backdrop-blur-sm w-fit text-sm"
+            >
+              <Download size={16} /> Excel
             </button>
           </div>
         </div>
@@ -430,7 +422,7 @@ export default function RekapitulasiPage() {
               </h3>
               <div className="flex gap-2">
                 <button
-                  onClick={() => handleExport(false)}
+                  onClick={() => handleExport('pdf', false)}
                   className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-xl text-sm transition-colors flex items-center gap-2"
                 >
                   <Download size={16} /> Download
@@ -443,12 +435,41 @@ export default function RekapitulasiPage() {
                 </button>
               </div>
             </div>
-            <div className="flex-1 bg-gray-200 dark:bg-black/50 p-4">
+            {/* Desktop: iframe preview */}
+            <div className="hidden md:block flex-1 bg-gray-200 dark:bg-black/50 p-4 h-full">
               <iframe 
                 src={pdfUrl} 
                 className="w-full h-full rounded-xl shadow-inner bg-white"
                 title="PDF Preview"
+                style={{ minHeight: '60vh' }}
               />
+            </div>
+            {/* Mobile: fallback card */}
+            <div className="flex md:hidden flex-1 flex-col items-center justify-center gap-5 p-8 bg-gray-50 dark:bg-gray-900/50">
+              <div className="w-20 h-20 bg-purple-100 dark:bg-purple-900/40 rounded-full flex items-center justify-center">
+                <FileText size={40} className="text-purple-500" />
+              </div>
+              <div className="text-center">
+                <p className="font-bold text-gray-700 dark:text-gray-200 mb-1">Preview PDF tidak tersedia di HP</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Browser HP tidak mendukung tampilan PDF dalam aplikasi. Gunakan tombol di bawah untuk membuka atau mengunduh file PDF.</p>
+              </div>
+              <div className="flex flex-col gap-3 w-full max-w-xs">
+                <a
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-2xl shadow-md transition-colors"
+                >
+                  <FileText size={18} /> Buka di Tab Baru
+                </a>
+                <a
+                  href={pdfUrl}
+                  download
+                  className="flex items-center justify-center gap-2 w-full py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold rounded-2xl transition-colors"
+                >
+                  <Download size={18} /> Unduh PDF
+                </a>
+              </div>
             </div>
           </div>
         </div>

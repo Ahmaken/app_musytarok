@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Lock, User, CalendarDays, Clock } from 'lucide-react';
+import { Lock, User, CalendarDays, Clock, Fingerprint, Eye } from 'lucide-react';
+import { startAuthentication } from '@simplewebauthn/browser';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -13,16 +14,21 @@ export default function LoginPage() {
 
   const [mounted, setMounted] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [webAuthnSupported, setWebAuthnSupported] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    // Check if WebAuthn is supported
+    if (typeof window !== 'undefined' && window.PublicKeyCredential) {
+      setWebAuthnSupported(true);
+    }
     return () => clearInterval(timer);
   }, []);
 
   const getHijriDate = (date: Date) => {
     try {
-      return new Intl.DateTimeFormat('ar-SA-u-ca-islamic', {day: 'numeric', month: 'long', year: 'numeric'}).format(date);
+      return new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', {day: 'numeric', month: 'long', year: 'numeric'}).format(date).replace(/هـ/g, 'هـ');
     } catch (e) {
       return '';
     }
@@ -54,7 +60,65 @@ export default function LoginPage() {
         throw new Error(data.error || 'Terjadi kesalahan saat login');
       }
 
-      // Berhasil login, arahkan ke dashboard
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGuestLogin = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guest: true })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal masuk sebagai tamu');
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleWebAuthnLogin = async () => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      // 1. Dapatkan authentication options dari server
+      const query = username ? `?username=${encodeURIComponent(username)}` : '';
+      const resp = await fetch(`/api/auth/webauthn/login/generate${query}`);
+      const options = await resp.json();
+      
+      if (!resp.ok) throw new Error(options.error || 'Gagal memulai autentikasi biometrik');
+
+      // 2. Tampilkan prompt WebAuthn ke user
+      let authResp;
+      try {
+        authResp = await startAuthentication(options);
+      } catch (err: any) {
+        throw new Error('Autentikasi biometrik dibatalkan atau gagal.');
+      }
+
+      // 3. Verifikasi response ke server
+      const verifyResp = await fetch('/api/auth/webauthn/login/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(authResp)
+      });
+      
+      const verification = await verifyResp.json();
+      
+      if (!verifyResp.ok) throw new Error(verification.error || 'Verifikasi biometrik gagal');
+      
+      // Sukses!
       router.push('/dashboard');
     } catch (err: any) {
       setError(err.message);
@@ -69,7 +133,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md bg-white/10 backdrop-blur-md rounded-2xl p-4 mb-4 shadow-xl border border-white/20 text-center animate-[slideDown_0.5s_ease-out]">
           <div className="flex justify-center items-center gap-2 text-white font-medium text-sm md:text-base">
             <CalendarDays className="h-5 w-5" />
-            <span className="font-[family-name:var(--font-cairo)] text-xl md:text-2xl mt-1 tracking-wide font-bold" dir="rtl">{getHijriDate(currentTime)}</span>
+            <span className="font-cairo text-xl md:text-2xl mt-1 tracking-wide font-bold" dir="rtl">{getHijriDate(currentTime)}</span>
           </div>
           <div className="flex justify-center items-center gap-2 text-green-100 text-xs md:text-sm mt-1">
             <span>{getMasehiDate(currentTime)}</span>
@@ -114,18 +178,31 @@ export default function LoginPage() {
 
           <div className="space-y-1">
             <label className="text-sm font-medium text-green-50 ml-1">Password</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="h-5 w-5 text-green-200" />
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-green-200" />
+                </div>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-green-200 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent transition-all"
+                  placeholder="Masukkan password Anda"
+                  required
+                />
               </div>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-green-200 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent transition-all"
-                placeholder="Masukkan password Anda"
-                required
-              />
+              {webAuthnSupported && (
+                <button
+                  type="button"
+                  onClick={handleWebAuthnLogin}
+                  disabled={loading}
+                  className="flex-shrink-0 w-[52px] flex flex-col items-center justify-center bg-white/10 border border-white/20 rounded-xl hover:bg-white/20 hover:scale-[1.02] active:scale-[0.98] transition-all focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent group"
+                  title="Login dengan Sidik Jari / Biometrik"
+                >
+                  <Fingerprint className="h-6 w-6 text-white group-hover:text-green-200 transition-colors" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -143,7 +220,25 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-8 text-center">
+        <div className="mt-6 text-center">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex-1 h-px bg-white/20" />
+            <span className="text-white/50 text-xs select-none bg-green-800/80 px-2 rounded">atau</span>
+            <div className="flex-1 h-px bg-white/20" />
+          </div>
+          <button
+            type="button"
+            onClick={handleGuestLogin}
+            disabled={loading}
+            className="w-full py-3 flex items-center justify-center gap-2 bg-white/5 hover:bg-white/15 border border-white/20 text-white/80 hover:text-white font-semibold rounded-xl transition-all text-sm disabled:opacity-50"
+          >
+            <User className="h-4 w-4" />
+            Masuk sebagai Tamu
+          </button>
+          <p className="text-[10px] text-green-200/60 mt-2">Tamu hanya dapat melihat struktur menu tanpa akses data</p>
+        </div>
+
+        <div className="mt-6 text-center">
           <p className="text-xs text-green-200">
             &copy; {new Date().getFullYear()} PP. Matholi'ul Anwar
           </p>

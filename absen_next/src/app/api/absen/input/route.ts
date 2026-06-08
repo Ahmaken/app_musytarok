@@ -46,8 +46,11 @@ export async function GET(request: Request) {
         const [check] = await pool.execute<RowDataPacket[]>(
           `SELECT 1 FROM murid m 
            JOIN kamar km ON m.kamar_id = km.kamar_id 
-           WHERE km.nama_asrama = ? AND m.kelas_quran_id = ? LIMIT 1`,
-          [namaAsrama, kelas_id]
+           WHERE km.nama_asrama = ? AND m.kelas_quran_id = ?
+           UNION
+           SELECT 1 FROM kelas_quran
+           WHERE nama_kelas LIKE ? AND id = ? LIMIT 1`,
+          [namaAsrama, kelas_id, `%${namaAsrama}%`, kelas_id]
         );
         if (check.length === 0) {
           return NextResponse.json({ error: 'Akses ditolak: Kelas Qur\'an ini tidak memiliki santri dari asrama Anda' }, { status: 403 });
@@ -69,27 +72,27 @@ export async function GET(request: Request) {
     if (role === 'pengurus_asrama' && namaAsrama) {
       // Pengurus asrama hanya melihat santri dari asrama mereka sendiri
       if (tipe === 'madin') {
-        query = `SELECT murid_id, nis, nama FROM murid m
+        query = `SELECT murid_id, nis, nama, nama_panggilan FROM murid m
           JOIN kamar km ON m.kamar_id = km.kamar_id
           WHERE m.kelas_madin_id = ? AND km.nama_asrama = ? ORDER BY m.nama ASC`;
         params = [kelas_id, namaAsrama];
       } else if (tipe === 'quran') {
-        query = `SELECT murid_id, nis, nama FROM murid m
+        query = `SELECT murid_id, nis, nama, nama_panggilan FROM murid m
           JOIN kamar km ON m.kamar_id = km.kamar_id
           WHERE m.kelas_quran_id = ? AND km.nama_asrama = ? ORDER BY m.nama ASC`;
         params = [kelas_id, namaAsrama];
       } else if (tipe === 'kegiatan') {
-        query = 'SELECT murid_id, nis, nama FROM murid WHERE kamar_id = ? ORDER BY nama ASC';
+        query = 'SELECT murid_id, nis, nama, nama_panggilan FROM murid WHERE kamar_id = ? ORDER BY nama ASC';
       } else {
         return NextResponse.json({ error: 'Tipe tidak valid' }, { status: 400 });
       }
     } else {
       if (tipe === 'madin') {
-        query = 'SELECT murid_id, nis, nama FROM murid WHERE kelas_madin_id = ? ORDER BY nama ASC';
+        query = 'SELECT murid_id, nis, nama, nama_panggilan FROM murid WHERE kelas_madin_id = ? ORDER BY nama ASC';
       } else if (tipe === 'quran') {
-        query = 'SELECT murid_id, nis, nama FROM murid WHERE kelas_quran_id = ? ORDER BY nama ASC';
+        query = 'SELECT murid_id, nis, nama, nama_panggilan FROM murid WHERE kelas_quran_id = ? ORDER BY nama ASC';
       } else if (tipe === 'kegiatan') {
-        query = 'SELECT murid_id, nis, nama FROM murid WHERE kamar_id = ? ORDER BY nama ASC';
+        query = 'SELECT murid_id, nis, nama, nama_panggilan FROM murid WHERE kamar_id = ? ORDER BY nama ASC';
       } else {
         return NextResponse.json({ error: 'Tipe tidak valid' }, { status: 400 });
       }
@@ -123,7 +126,26 @@ export async function GET(request: Request) {
       keterangan: existingMap[m.murid_id]?.keterangan || ''
     }));
 
-    return NextResponse.json({ success: true, data: mappedMurid });
+    // Query nama kelas/kamar untuk laporan
+    let namaTarget = 'Kelas/Kamar';
+    try {
+      if (tipe === 'madin') {
+        const [rows]: any = await pool.execute('SELECT nama_kelas FROM kelas_madin WHERE kelas_id = ? LIMIT 1', [kelas_id]);
+        if (rows.length > 0) namaTarget = `Kelas Madin ${rows[0].nama_kelas}`;
+      } else if (tipe === 'quran') {
+        const [rows]: any = await pool.execute('SELECT nama_kelas FROM kelas_quran WHERE id = ? LIMIT 1', [kelas_id]);
+        if (rows.length > 0) namaTarget = `Kelas Qur'an ${rows[0].nama_kelas}`;
+      } else if (tipe === 'kegiatan') {
+        const [rows]: any = await pool.execute('SELECT nama_kamar, nama_asrama FROM kamar WHERE kamar_id = ? LIMIT 1', [kelas_id]);
+        if (rows.length > 0) {
+          namaTarget = `Kamar ${rows[0].nama_kamar} (${rows[0].nama_asrama || 'Asrama'})`;
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching target name:', e);
+    }
+
+    return NextResponse.json({ success: true, data: mappedMurid, namaTarget });
   } catch (err: any) {
     return NextResponse.json({ error: 'Server error: ' + err.message }, { status: 500 });
   }
@@ -189,8 +211,11 @@ export async function POST(request: Request) {
         const [check] = await connection.execute<RowDataPacket[]>(
           `SELECT 1 FROM murid m 
            JOIN kamar km ON m.kamar_id = km.kamar_id 
-           WHERE km.nama_asrama = ? AND m.kelas_quran_id = ? LIMIT 1`,
-          [namaAsrama, kelas_id]
+           WHERE km.nama_asrama = ? AND m.kelas_quran_id = ?
+           UNION
+           SELECT 1 FROM kelas_quran
+           WHERE nama_kelas LIKE ? AND id = ? LIMIT 1`,
+          [namaAsrama, kelas_id, `%${namaAsrama}%`, kelas_id]
         );
         if (check.length === 0) {
           return NextResponse.json({ error: 'Akses ditolak: Kelas Qur\'an ini tidak memiliki santri dari asrama Anda' }, { status: 403 });
@@ -239,7 +264,7 @@ export async function POST(request: Request) {
     // 1. Delete existing for today
     await connection.execute(deleteQuery, [jadwal_id, localISOTime]);
 
-    // 2. Insert new
+    // 2. Insert new & update nickname
     for (const item of absensi) {
       await connection.execute(insertQuery, [
         jadwal_id,
@@ -248,13 +273,20 @@ export async function POST(request: Request) {
         item.status,
         item.keterangan || ''
       ]);
+
+      if (item.nama_panggilan !== undefined) {
+        await connection.execute(
+          'UPDATE murid SET nama_panggilan = ? WHERE murid_id = ?',
+          [item.nama_panggilan || null, item.murid_id]
+        );
+      }
     }
 
     // 3. Mark guru as Hadir (jika belum)
     if (payload.role === 'guru' && payload.guruId) {
       // Check if already exist
       const [guruAbsen] = await connection.execute<RowDataPacket[]>(
-        `SELECT id FROM absensi_guru WHERE guru_id = ? AND tanggal = ? AND ${tipe === 'madin' ? 'jadwal_madin_id' : tipe === 'quran' ? 'jadwal_quran_id' : 'kegiatan_id'} = ?`,
+        `SELECT absensi_id FROM absensi_guru WHERE guru_id = ? AND tanggal = ? AND ${tipe === 'madin' ? 'jadwal_madin_id' : tipe === 'quran' ? 'jadwal_quran_id' : 'kegiatan_id'} = ?`,
         [payload.guruId, localISOTime, jadwal_id]
       );
       if (guruAbsen.length === 0) {

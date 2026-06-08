@@ -60,7 +60,7 @@ export async function GET(request: Request) {
 
     if (tab === 'alpa') {
       const [rows] = await pool.execute<RowDataPacket[]>(
-        `SELECT p.pelanggaran_id as id, m.nama as nama, 
+        `SELECT p.pelanggaran_id as id, m.nama as nama, m.jenis_kelamin as jenis_kelamin,
                 p.tanggal, p.deskripsi as keterangan, p.jenis as status 
          FROM pelanggaran p
          JOIN murid m ON p.murid_id = m.murid_id
@@ -74,6 +74,7 @@ export async function GET(request: Request) {
       const dataAlpa = rows.map(r => ({
         id: r.id,
         nama: r.nama,
+        jenis_kelamin: r.jenis_kelamin || '-',
         kelas: '-',
         tanggal: new Date(r.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
         raw_tanggal: r.tanggal,
@@ -84,7 +85,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: dataAlpa });
     } else {
       const [rows] = await pool.execute<RowDataPacket[]>(
-        `SELECT p.pelanggaran_id as id, m.nama as nama,
+        `SELECT p.pelanggaran_id as id, m.nama as nama, m.jenis_kelamin as jenis_kelamin,
                 p.tanggal, p.jenis as jenis, p.deskripsi
          FROM pelanggaran p
          JOIN murid m ON p.murid_id = m.murid_id
@@ -98,6 +99,7 @@ export async function GET(request: Request) {
       const dataPelanggaran = rows.map(r => ({
         id: r.id,
         nama: r.nama,
+        jenis_kelamin: r.jenis_kelamin || '-',
         kelas: '-',
         tanggal: new Date(r.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
         raw_tanggal: r.tanggal,
@@ -128,8 +130,55 @@ export async function DELETE(request: Request) {
   }
 }
 
+export async function POST(request: Request) {
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const payload = verifyToken(token);
+    if (!payload) return NextResponse.json({ error: 'Token invalid' }, { status: 401 });
+
+    const { role } = payload as any;
+    const allowed = ['admin', 'staff', 'pengurus_asrama', 'guru'];
+    if (!allowed.includes(role)) {
+      return NextResponse.json({ error: 'Akses ditolak' }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { murid_id, jenis, deskripsi, tanggal } = body;
+
+    if (!murid_id || !jenis || !tanggal) {
+      return NextResponse.json({ error: 'Field murid_id, jenis, dan tanggal wajib diisi' }, { status: 400 });
+    }
+
+    await pool.execute(
+      'INSERT INTO pelanggaran (murid_id, jenis, deskripsi, tanggal) VALUES (?, ?, ?, ?)',
+      [murid_id, jenis, deskripsi || '', tanggal]
+    );
+
+    return NextResponse.json({ success: true, message: 'Data pelanggaran berhasil ditambahkan' });
+  } catch (error: any) {
+    console.error('POST Ketertiban Error:', error.message);
+    return NextResponse.json({ error: 'Server error: ' + error.message }, { status: 500 });
+  }
+}
+
 export async function PUT(request: Request) {
   try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const payload = verifyToken(token);
+    if (!payload) return NextResponse.json({ error: 'Token invalid' }, { status: 401 });
+
+    const { role } = payload as any;
+    const allowed = ['admin', 'staff', 'pengurus_asrama', 'guru'];
+    if (!allowed.includes(role)) {
+      return NextResponse.json({ error: 'Akses ditolak' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { id, jenis, deskripsi, tanggal } = body;
     

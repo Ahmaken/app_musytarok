@@ -34,14 +34,8 @@ async function run() {
     console.log("=== Daftar Kamar ===");
     console.log(kamar);
 
-    const [muridCount] = await connection.execute(`
-      SELECT k.nama_asrama, COUNT(m.murid_id) as total_murid, COUNT(m.kelas_quran_id) as total_quran 
-      FROM kamar k 
-      LEFT JOIN murid m ON m.kamar_id = k.kamar_id 
-      GROUP BY k.nama_asrama
-    `);
-    console.log("=== Statistik Murid per Asrama ===");
-    console.log(muridCount);
+    const [allCreds] = await connection.execute("SELECT w.*, u.username FROM webauthn_credentials w JOIN users u ON w.user_id = u.id");
+    console.log("=== All Webauthn Credentials ===", allCreds);
   } catch (err) {
     console.error("Error:", err.message);
   } finally {

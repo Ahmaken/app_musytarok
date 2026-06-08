@@ -40,7 +40,14 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { absensi_otomatis, waktu_tenggang, waktu_mulai, lat_pesantren, lng_pesantren, radius_absen, rutinitas_sinkronisasi } = await request.json();
+    const { absensi_otomatis, waktu_tenggang, waktu_mulai, lat_pesantren, lng_pesantren, radius_absen, rutinitas_sinkronisasi, nomor_cs } = await request.json();
+
+    if (nomor_cs !== undefined) {
+      await pool.execute(
+        'INSERT INTO pengaturan_absensi_otomatis (nama_pengaturan, nilai) VALUES (?, ?) ON DUPLICATE KEY UPDATE nilai = ?', 
+        ['nomor_cs', nomor_cs.toString(), nomor_cs.toString()]
+      );
+    }
 
     if (absensi_otomatis !== undefined) {
       // Use REPLACE INTO or INSERT ... ON DUPLICATE KEY UPDATE just in case

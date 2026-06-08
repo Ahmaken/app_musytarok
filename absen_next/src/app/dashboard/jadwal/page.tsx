@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CalendarDays, Clock, MapPin, User, Edit, CheckSquare } from 'lucide-react';
+import { CalendarDays, Clock, MapPin, User, Edit, CheckSquare, FileText, Download, X } from 'lucide-react';
 
 export default function JadwalPage() {
   const [jadwal, setJadwal] = useState<any[]>([]);
@@ -141,6 +141,64 @@ export default function JadwalPage() {
     return sortConfig.direction === 'ascending' ? ' ▲' : ' ▼';
   };
 
+  // Export State
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState('');
+
+  const handleExport = (format: 'pdf' | 'excel' = 'pdf', previewOnly = false) => {
+    let exportData = filteredJadwal;
+    
+    // Sort default by hari and jam_mulai if no sort config
+    if (!sortConfig) {
+       exportData = [...filteredJadwal].sort((a, b) => {
+         const hariDiff = hariOrder.indexOf(a.hari) - hariOrder.indexOf(b.hari);
+         if (hariDiff !== 0) return hariDiff;
+         return a.jam_mulai.localeCompare(b.jam_mulai);
+       });
+    } else {
+       exportData = sortedJadwal;
+    }
+
+    if (selectedJadwal.length > 0) {
+      exportData = exportData.filter(j => selectedJadwal.includes(j.id));
+    }
+
+    if (exportData.length === 0) {
+      alert('Tidak ada data untuk di-export.');
+      return;
+    }
+
+    const title = `JADWAL ${activeTab === 'quran' ? "AL-QUR'AN" : activeTab === 'madin' ? 'MADRASAH DINIYAH' : 'KEGIATAN ASRAMA'}`;
+    const subtitle = `Filter Guru: ${filterGuru || 'Semua'} | ${selectedJadwal.length > 0 ? `Export Terpilih (${selectedJadwal.length})` : 'Semua Data'}`;
+    const filename = `Jadwal_${activeTab}`;
+
+    const tableColumn = ["NO", "HARI", "JAM", "KEGIATAN", "TEMPAT", "GURU"];
+    const tableRows: any[] = [];
+
+    exportData.forEach((item, idx) => {
+      tableRows.push([
+        idx + 1,
+        item.hari || '-',
+        `${item.jam_mulai?.substring(0, 5) || '-'} s/d ${item.jam_selesai?.substring(0, 5) || '-'}`,
+        item.kegiatan || '-',
+        item.tempat || '-',
+        item.guru || '-'
+      ]);
+    });
+
+    if (format === 'excel') {
+      import('@/lib/exportUtils').then(({ exportToExcel }) => exportToExcel({ title, subtitle, columns: tableColumn, rows: tableRows, filename }));
+    } else {
+      import('@/lib/exportUtils').then(({ exportToPDF }) => {
+        const result = exportToPDF({ title, subtitle, columns: tableColumn, rows: tableRows, filename, previewOnly });
+        if (previewOnly && result) {
+          setPdfUrl(result);
+          setShowPdfPreview(true);
+        }
+      });
+    }
+  };
+
   const uniqueGurus = Array.from(new Set(jadwal.map(j => j.guru).filter(Boolean))).sort();
 
   const groupedJadwal = filteredJadwal.reduce((acc: any, curr: any) => {
@@ -257,19 +315,36 @@ export default function JadwalPage() {
         <button onClick={() => { setActiveTab('kegiatan'); setSelectedJadwal([]); }} className={`flex-1 min-w-[120px] py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'kegiatan' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>Kegiatan Asrama</button>
       </div>
 
-      {(role === 'admin' || role === 'staff') && (
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-          <label className="text-sm font-bold text-gray-600 dark:text-gray-300 flex items-center gap-2"><User size={16}/> Filter Guru:</label>
-          <select value={filterGuru} onChange={e => setFilterGuru(e.target.value)} className="w-full sm:w-64 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-green-500">
-            <option value="">Semua Guru</option>
-            {uniqueGurus.map((g: any) => <option key={g} value={g}>{g}</option>)}
-          </select>
-          <button onClick={handleOpenAddModal} className="ml-auto bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-2 rounded-xl text-sm transition-colors flex items-center justify-center gap-1" title="Tambah Jadwal">
-            <span className="hidden sm:inline">+ Tambah Jadwal</span>
-            <span className="sm:hidden text-lg leading-none">+</span>
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-x-auto">
+        {(role === 'admin' || role === 'staff') && (
+          <>
+            <label className="text-sm font-bold text-gray-600 dark:text-gray-300 flex items-center gap-2 shrink-0"><User size={16}/> Filter Guru:</label>
+            <select value={filterGuru} onChange={e => setFilterGuru(e.target.value)} className="w-full sm:w-64 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-green-500 shrink-0">
+              <option value="">Semua Guru</option>
+              {uniqueGurus.map((g: any) => <option key={g} value={g}>{g}</option>)}
+            </select>
+          </>
+        )}
+
+        <div className="flex gap-2 shrink-0 ml-auto sm:ml-0 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0">
+          <button onClick={() => handleExport('pdf', true)} className="px-3 py-2 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-xl text-xs font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-1.5 shrink-0" title="Preview PDF">
+            <FileText size={14} /> Preview
           </button>
+          <button onClick={() => handleExport('pdf', false)} className="px-3 py-2 bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors flex items-center gap-1.5 shrink-0" title="Export PDF">
+            <Download size={14} /> PDF
+          </button>
+          <button onClick={() => handleExport('excel', false)} className="px-3 py-2 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800 rounded-xl text-xs font-bold hover:bg-green-100 transition-colors flex items-center gap-1.5 shrink-0" title="Export Excel">
+            <Download size={14} /> Excel
+          </button>
+
+          {(role === 'admin' || role === 'staff') && (
+            <button onClick={handleOpenAddModal} className="bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-2 rounded-xl text-sm transition-colors flex items-center justify-center gap-1 shrink-0" title="Tambah Jadwal">
+              <span className="hidden sm:inline">+ Tambah Jadwal</span>
+              <span className="sm:hidden text-lg leading-none">+</span>
+            </button>
+          )}
         </div>
-      )}
+      </div>
 
       {(role === 'admin' || role === 'staff') && selectedJadwal.length > 0 && (
         <div className="flex flex-wrap gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -508,6 +583,70 @@ export default function JadwalPage() {
                 <button type="submit" disabled={savingAdd} className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl disabled:opacity-50 transition-colors">Simpan</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Preview Modal */}
+      {showPdfPreview && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-5xl h-[85vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-[slideUp_0.3s_ease-out]">
+            <div className="flex justify-between items-center p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+              <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                <FileText className="text-green-500" size={20} />
+                Preview PDF Jadwal
+              </h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleExport('pdf', false)}
+                  className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-xl text-sm transition-colors flex items-center gap-2"
+                >
+                  <Download size={16} /> Download
+                </button>
+                <button
+                  onClick={() => setShowPdfPreview(false)}
+                  className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 p-2 rounded-xl transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            {/* Desktop: iframe preview */}
+            <div className="hidden md:block flex-1 bg-gray-200 dark:bg-black/50 p-4 h-full">
+              <iframe 
+                src={pdfUrl} 
+                className="w-full h-full rounded-xl shadow-inner bg-white"
+                title="PDF Preview"
+                style={{ minHeight: '60vh' }}
+              />
+            </div>
+            {/* Mobile: fallback card */}
+            <div className="flex md:hidden flex-1 flex-col items-center justify-center gap-5 p-8 bg-gray-50 dark:bg-gray-900/50">
+              <div className="w-20 h-20 bg-green-100 dark:bg-green-900/40 rounded-full flex items-center justify-center">
+                <FileText size={40} className="text-green-500" />
+              </div>
+              <div className="text-center">
+                <p className="font-bold text-gray-700 dark:text-gray-200 mb-1">Preview PDF tidak tersedia di HP</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Browser HP tidak mendukung tampilan PDF dalam aplikasi. Gunakan tombol di bawah untuk membuka atau mengunduh file PDF.</p>
+              </div>
+              <div className="flex flex-col gap-3 w-full max-w-xs">
+                <a
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-2xl shadow-md transition-colors"
+                >
+                  <FileText size={18} /> Buka di Tab Baru
+                </a>
+                <a
+                  href={pdfUrl}
+                  download
+                  className="flex items-center justify-center gap-2 w-full py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold rounded-2xl transition-colors"
+                >
+                  <Download size={18} /> Unduh PDF
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       )}

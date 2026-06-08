@@ -13,6 +13,9 @@ export default function DashboardPage() {
   
   const [schedules, setSchedules] = useState<any[]>([]);
   const [loadingSchedules, setLoadingSchedules] = useState(true);
+  
+  const [dateStr, setDateStr] = useState('');
+  const [hijriDateStr, setHijriDateStr] = useState('');
 
   useEffect(() => {
     // Menentukan ucapan berdasarkan waktu
@@ -60,23 +63,31 @@ export default function DashboardPage() {
 
     fetchUser();
     fetchSchedules();
-  }, []);
 
-  // Format tanggal dan ganti 'Minggu' menjadi 'Ahad'
-  const dateStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace('Minggu', 'Ahad');
+    // Populate dates on mount to avoid hydration mismatch
+    const localDate = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace('Minggu', 'Ahad');
+    setDateStr(localDate);
+
+    try {
+      const hijri = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
+      setHijriDateStr(hijri.replace(/هـ/g, 'هـ'));
+    } catch (e) {
+      setHijriDateStr('');
+    }
+  }, []);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header Greeting */}
       <div className="text-center py-8 bg-gradient-to-br from-green-50 to-emerald-100 dark:from-green-900/40 dark:to-emerald-900/40 rounded-3xl shadow-sm border border-green-200 dark:border-green-800/50 overflow-hidden relative transition-colors duration-300">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 via-emerald-500 to-green-600 dark:from-green-500 dark:via-emerald-600 dark:to-green-700"></div>
-        <h2 className="text-4xl md:text-5xl font-diwani text-green-800 dark:text-green-400 tracking-wider animate-[slideDown_0.8s_ease-out] mb-2 mt-1 drop-shadow-sm" dir="rtl">« السَّلاَمُ عَلَيْكُمْ وَرَحْمَةُ اللهِ »</h2>
-        <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-gray-100 animate-[slideDown_0.9s_ease-out]">
-          {greeting} <span className="text-green-600 dark:text-green-400 inline-block animate-pulse">!</span>
+        <h2 className="text-4xl md:text-5xl font-diwani text-green-800 dark:text-green-400 tracking-wider mb-2 mt-1 drop-shadow-sm transition-all duration-300" dir="rtl">« السَّلاَمُ عَلَيْكُمْ وَرَحْمَةُ اللهِ »</h2>
+        <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 dark:text-gray-100 transition-all duration-300">
+          {greeting} <span className="text-green-600 dark:text-green-400 inline-block">!</span>
         </h1>
 
         {/* Foto Profil & Nama User */}
-        <div className="flex flex-col items-center mt-6 animate-[fadeIn_1.2s_ease-out_0.3s_forwards] opacity-0 relative z-10">
+        <div className="flex flex-col items-center mt-6 relative z-10 transition-all duration-300">
           <button
             onClick={() => profilePic ? setShowFullPic(true) : alert('Silakan pergi ke menu Profil (ikon orang di bawah) untuk mengatur foto Anda.')}
             className="relative group w-20 h-20 rounded-full border-4 border-white dark:border-gray-800 shadow-md overflow-hidden bg-green-100 dark:bg-green-800 flex items-center justify-center transition-transform hover:scale-105"
@@ -97,18 +108,22 @@ export default function DashboardPage() {
           <p className="text-green-800 dark:text-green-300 font-extrabold mt-3 text-xl drop-shadow-sm">
             {username}
           </p>
-          <span className="bg-green-200/50 dark:bg-green-900/50 text-green-700 dark:text-green-400 text-[10px] px-3 py-1 rounded-full mt-1 font-bold backdrop-blur-sm border border-green-300/30 uppercase tracking-wide">
+          <span className="bg-green-200/80 dark:bg-green-950/80 text-green-800 dark:text-green-300 text-[10px] px-3 py-1 rounded-full mt-1 font-bold border border-green-300/50 uppercase tracking-wide">
             {role}
           </span>
         </div>
 
         {/* Tanggal */}
-        <p className="text-xs text-gray-600 dark:text-gray-300 mt-6 font-medium bg-white/60 dark:bg-black/30 backdrop-blur-sm inline-block px-4 py-1.5 rounded-full animate-[fadeIn_1.5s_ease-out_0.5s_forwards] opacity-0 shadow-sm border border-white/40 dark:border-white/10">
-          {dateStr}
-          <span className="mx-3 opacity-30">|</span>
-          <span className="font-arabic text-sm text-green-700 dark:text-green-400 font-bold tracking-wide" dir="rtl">
-            {new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date()).replace(/هـ/g, 'هـ')}
-          </span>
+        <p className="text-xs text-gray-700 dark:text-gray-200 mt-6 font-semibold bg-white/95 dark:bg-gray-900/95 inline-block px-4 py-1.5 rounded-full shadow-sm border border-gray-200 dark:border-gray-800 transition-all duration-300">
+          {dateStr || 'Memuat tanggal...'}
+          {hijriDateStr && (
+            <>
+              <span className="mx-3 opacity-30">|</span>
+              <span className="font-arabic text-sm text-green-700 dark:text-green-400 font-bold tracking-wide" dir="rtl">
+                {hijriDateStr}
+              </span>
+            </>
+          )}
         </p>
       </div>
 
@@ -117,7 +132,15 @@ export default function DashboardPage() {
         <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200 mb-3 flex items-center gap-2">
           <Activity size={18} className="text-green-600 dark:text-green-400" /> Menu Cepat
         </h3>
-        <div className={`grid gap-3 ${(role === 'admin' || role === 'pengurus_asrama' || role === 'staff') ? 'grid-cols-4' : role !== 'wali_murid' ? 'grid-cols-4' : 'grid-cols-3'}`}>
+        <div className={`grid gap-3 ${
+          role === 'tamu'
+            ? 'grid-cols-2'
+            : (role === 'admin' || role === 'pengurus_asrama' || role === 'staff')
+            ? 'grid-cols-4'
+            : role !== 'wali_murid'
+            ? 'grid-cols-4'
+            : 'grid-cols-3'
+        }`}>
           {(role === 'admin' || role === 'pengurus_asrama' || role === 'staff') && (
             <Link 
               href="/dashboard/scan-absen" 
@@ -127,7 +150,7 @@ export default function DashboardPage() {
               <span className="text-[10px] font-semibold text-center">Scan Absen</span>
             </Link>
           )}
-          {role !== 'wali_murid' && (
+          {role !== 'wali_murid' && role !== 'tamu' && (
             <Link href="/dashboard/absen" className="flex flex-col items-center justify-center p-3 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-2xl border border-blue-100 dark:border-blue-800/50 shadow-sm hover:bg-blue-100 dark:hover:bg-blue-900/50 transition">
               <ClipboardCheck size={24} className="mb-2" />
               <span className="text-[10px] font-semibold text-center">Input Absen</span>
@@ -137,10 +160,12 @@ export default function DashboardPage() {
             <CalendarDays size={24} className="mb-2" />
             <span className="text-[10px] font-semibold text-center">Lihat Jadwal</span>
           </Link>
-          <Link href="/dashboard/murid" className="flex flex-col items-center justify-center p-3 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-2xl border border-orange-100 dark:border-orange-800/50 shadow-sm hover:bg-orange-100 dark:hover:bg-orange-900/50 transition">
-            <Users size={24} className="mb-2" />
-            <span className="text-[10px] font-semibold text-center">Data Murid</span>
-          </Link>
+          {role !== 'tamu' && (
+            <Link href="/dashboard/murid" className="flex flex-col items-center justify-center p-3 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-2xl border border-orange-100 dark:border-orange-800/50 shadow-sm hover:bg-orange-100 dark:hover:bg-orange-900/50 transition">
+              <Users size={24} className="mb-2" />
+              <span className="text-[10px] font-semibold text-center">Data Murid</span>
+            </Link>
+          )}
           <Link href="/dashboard/rekapitulasi" className="flex flex-col items-center justify-center p-3 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-2xl border border-purple-100 dark:border-purple-800/50 shadow-sm hover:bg-purple-100 dark:hover:bg-purple-900/50 transition">
             <FileText size={24} className="mb-2" />
             <span className="text-[10px] font-semibold text-center">Rekapitulasi</span>
@@ -150,7 +175,7 @@ export default function DashboardPage() {
 
       {/* Daftar Jadwal Hari Ini */}
       <section className="space-y-4">
-        {['kegiatan', 'quran', 'madin'].map(tipe => {
+        {['kegiatan', 'quran', 'madin'].filter(tipe => role === 'admin' || role === 'staff' || schedules.some(s => s.tipe === tipe)).map(tipe => {
           const tipeName = tipe === 'kegiatan' ? 'Kegiatan' : tipe === 'quran' ? "Qur'an" : 'Madin';
           const Icon = tipe === 'kegiatan' ? Clock : BookOpen;
           const tipeSchedules = schedules.filter(s => s.tipe === tipe);
@@ -175,9 +200,15 @@ export default function DashboardPage() {
                           <span className="flex items-center gap-1"><BookOpen size={12}/> {sched.nama_kelas}</span>
                         </div>
                       </div>
-                      <Link href={`/dashboard/absen/input?tipe=${sched.tipe}&kelas_id=${sched.kelas_id}&jadwal_id=${sched.jadwal_id}`} className="px-3 py-1.5 bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 hover:bg-blue-100 text-xs font-bold rounded-lg transition-colors border border-blue-200 dark:border-blue-800">
-                        Isi Absen
-                      </Link>
+                      {role === 'tamu' ? (
+                        <span className="px-3 py-1.5 bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500 text-xs font-bold rounded-lg border border-gray-200 dark:border-gray-700 cursor-not-allowed select-none">
+                          Hanya Lihat
+                        </span>
+                      ) : (
+                        <Link href={`/dashboard/absen/input?tipe=${sched.tipe}&kelas_id=${sched.kelas_id}&jadwal_id=${sched.jadwal_id}`} className="px-3 py-1.5 bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 hover:bg-blue-100 text-xs font-bold rounded-lg transition-colors border border-blue-200 dark:border-blue-800">
+                          Isi Absen
+                        </Link>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -223,9 +254,11 @@ export default function DashboardPage() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {['Qur\'an', 'Madin', 'Kegiatan'].map((tipe) => (
+          {['quran', 'madin', 'kegiatan'].filter(tipe => role === 'admin' || role === 'staff' || schedules.some(s => s.tipe === tipe)).map((tipe) => {
+            const tipeName = tipe === 'quran' ? 'Qur\'an' : tipe === 'madin' ? 'Madin' : 'Kegiatan';
+            return (
             <div key={tipe} className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 transition-colors duration-300">
-              <h4 className="text-xs font-bold text-green-700 dark:text-green-400 mb-3 border-b dark:border-gray-700 pb-2">Statistik Absensi {tipe}</h4>
+              <h4 className="text-xs font-bold text-green-700 dark:text-green-400 mb-3 border-b dark:border-gray-700 pb-2">Statistik Absensi {tipeName}</h4>
               <div className="space-y-2">
                 <div className="flex justify-between items-center text-xs dark:text-gray-300">
                   <span className="flex items-center gap-1 text-red-600 dark:text-red-400"><XCircle size={14} /> Alpha</span>
@@ -252,7 +285,8 @@ export default function DashboardPage() {
                 <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5"><div className="bg-blue-400 h-1.5 rounded-full" style={{ width: '0%' }}></div></div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 

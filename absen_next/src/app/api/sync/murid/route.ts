@@ -49,6 +49,7 @@ export async function GET(request: Request) {
     let syncedCount = 0;
     let newCount = 0;
     let updatedCount = 0;
+    let deletedCount = 0;
 
     // 2. Loop data dan sinkronisasikan ke database absensi
     for (const santri of dataSantriMitra) {
@@ -71,15 +72,62 @@ export async function GET(request: Request) {
       }
 
       const nama_wali = santri.ayah || santri.ibu || null;
-      const foto = santri.foto || null;
+      const jenis_kelamin = santri.gender === 'L' ? 'Laki-laki' : (santri.gender === 'P' ? 'Perempuan' : null);
+
+      // Konversi path foto menjadi URL lengkap SmartPesantren agar dapat langsung ditampilkan
+      let foto: string | null = null;
+      if (santri.foto && santri.foto.trim() !== '-' && santri.foto.trim() !== '') {
+        const rawFoto = santri.foto.trim();
+        if (rawFoto.startsWith('http://') || rawFoto.startsWith('https://')) {
+          // Sudah URL lengkap — simpan langsung
+          foto = rawFoto;
+        } else {
+          // Path relatif — tentukan folder dinamis berdasarkan nama file
+          // Contoh file: Berkas_2026_2026050140.jpg -> disimpan di /dist/Berkas_2026/
+          const baseDomain = 'https://mawar.smartpesantren.id/dist';
+          
+          const parts = rawFoto.split('_');
+          if (parts.length >= 2) {
+             const folderName = `${parts[0]}_${parts[1]}`; // misal: Berkas_2026
+             foto = `${baseDomain}/${folderName}/${rawFoto}`;
+          } else {
+             // Fallback jika format nama file berbeda
+             foto = `${baseDomain}/berkas/${rawFoto}`;
+          }
+        }
+      }
       
       if (!nis) continue; // Lewati jika tidak ada NIS (identifier utama)
+
+      // Identifikasi apakah anak tersebut santri mukim (punya kamar aktif atau kelas madin aktif di mitra)
+      const kamarMitra = santri.kamar || '';
+      const madrasiahMitra = santri.madrasiah || '';
+      
+      const kamarMitraLower = kamarMitra.trim().toLowerCase();
+      const madrasiahMitraLower = madrasiahMitra.trim().toLowerCase();
+      
+      // Kriteria Non-Santri (Murid Sekolah Saja): Kamar kosong/-, atau kamar 'lppm' / 'lppmp'
+      const hasValidKamar = kamarMitraLower !== '-' && kamarMitraLower !== '' && kamarMitraLower !== 'lppm' && kamarMitraLower !== 'lppmp';
+      
+      // Kriteria Kelas Madin Aktif: Tidak kosong/-, dan statusnya bukan 'boyong'
+      const hasValidMadrasiah = madrasiahMitraLower !== '-' && madrasiahMitraLower !== '' && madrasiahMitraLower !== 'boyong';
+      
+      const isSantri = hasValidKamar || hasValidMadrasiah;
+
+      if (!isSantri) {
+        // Jika murid non-santri ada di database kita, hapus untuk membersihkan data
+        const [delResult]: any = await db.query('DELETE FROM murid WHERE nis = ?', [nis]);
+        if (delResult.affectedRows > 0) {
+          deletedCount++;
+        }
+        continue; // Lewati sinkronisasi (tidak di-insert atau update)
+      }
 
       // Cek apakah murid sudah ada di database absensi (menggunakan kolom murid_id sesuai schema)
       const [existingRows]: any = await db.query('SELECT murid_id FROM murid WHERE nis = ?', [nis]);
       
       if (existingRows.length > 0) {
-        // Jika sudah ada, UPDATE data yang mungkin berubah (Nama, No HP, NIK, Alamat, Wali, Foto)
+        // Jika sudah ada, UPDATE data yang mungkin berubah (Nama, No HP, NIK, Alamat, Wali, Foto, Jenis Kelamin)
         // Kolom barcode_id sengaja TIDAK di-overwrite agar kartu QR yang sudah discan tidak hilang!
         await db.query(
           `UPDATE murid SET 
@@ -88,18 +136,19 @@ export async function GET(request: Request) {
             nik = ?, 
             alamat = ?, 
             nama_wali = ?, 
-            foto = ? 
+            foto = ?,
+            jenis_kelamin = ?
           WHERE nis = ?`,
-          [nama, no_hp, nik, alamat, nama_wali, foto, nis]
+          [nama, no_hp, nik, alamat, nama_wali, foto, jenis_kelamin, nis]
         );
         updatedCount++;
       } else {
         // Jika belum ada (Murid Baru), INSERT ke database
         await db.query(
           `INSERT INTO murid 
-            (nis, nama, no_hp, nik, alamat, nama_wali, foto) 
-          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [nis, nama, no_hp, nik, alamat, nama_wali, foto]
+            (nis, nama, no_hp, nik, alamat, nama_wali, foto, jenis_kelamin) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [nis, nama, no_hp, nik, alamat, nama_wali, foto, jenis_kelamin]
         );
         newCount++;
       }
@@ -119,7 +168,8 @@ export async function GET(request: Request) {
       total_data_mitra: dataSantriMitra.length,
       processed: syncedCount,
       new_students: newCount,
-      updated_students: updatedCount
+      updated_students: updatedCount,
+      deleted_non_santri: deletedCount
     });
 
   } catch (error: any) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Users, CheckCircle, XCircle, Clock, AlertTriangle, ArrowLeft, Save } from 'lucide-react';
+import { Users, CheckCircle, XCircle, Clock, AlertTriangle, ArrowLeft, Save, Camera, Image } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -17,9 +17,13 @@ function InputAbsenContent() {
   const [murid, setMurid] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
   const [locationError, setLocationError] = useState('');
+  const [namaTarget, setNamaTarget] = useState('Kelas/Kamar');
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useEffect(() => {
     if (!tipe || !kelas_id || !jadwal_id) {
@@ -34,6 +38,7 @@ function InputAbsenContent() {
         const json = await res.json();
         if (json.success) {
           setMurid(json.data);
+          if (json.namaTarget) setNamaTarget(json.namaTarget);
         } else {
           setErrorMsg(json.error || 'Gagal memuat data santri');
         }
@@ -74,10 +79,120 @@ function InputAbsenContent() {
     setMurid(prev => prev.map(m => m.murid_id === murid_id ? { ...m, keterangan } : m));
   };
 
+  const handleNamaPanggilanChange = (murid_id: number, nama_panggilan: string) => {
+    setMurid(prev => prev.map(m => m.murid_id === murid_id ? { ...m, nama_panggilan } : m));
+  };
+
   const setAllStatus = (status: string) => {
     if (confirm(`Tandai semua santri sebagai ${status}?`)) {
       setMurid(prev => prev.map(m => ({ ...m, status })));
     }
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingPhoto(true);
+    try {
+      // Kita tidak lagi mengunggah ke server untuk menghemat ruang, melainkan hanya menyimpan blob URL di client
+      const localUrl = URL.createObjectURL(file);
+      setPhotoUrl(localUrl);
+    } catch (err) {
+      alert('Terjadi kesalahan saat memproses foto');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const generateWaGroupMessage = () => {
+    const dateStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const total = murid.length;
+    const hadir = murid.filter(m => m.status === 'Hadir').length;
+    const sakit = murid.filter(m => m.status === 'Sakit');
+    const izin = murid.filter(m => m.status === 'Izin');
+    const alpha = murid.filter(m => m.status === 'Alpha');
+
+    let msg = `*LAPORAN KEHADIRAN ${namaTarget.toUpperCase()}*\n`;
+    msg += `📅 *Hari/Tanggal:* ${dateStr}\n`;
+    msg += `👥 *Total Santri:* ${total}\n`;
+    msg += `✅ *Hadir:* ${hadir} anak\n\n`;
+
+    if (sakit.length > 0) {
+      msg += `🤒 *Sakit (${sakit.length}):*\n`;
+      sakit.forEach((m, idx) => {
+        const name = m.nama_panggilan || m.nama;
+        msg += `  ${idx + 1}. ${name}${m.keterangan ? ` (${m.keterangan})` : ''}\n`;
+      });
+      msg += `\n`;
+    }
+
+    if (izin.length > 0) {
+      msg += `✉️ *Izin (${izin.length}):*\n`;
+      izin.forEach((m, idx) => {
+        const name = m.nama_panggilan || m.nama;
+        msg += `  ${idx + 1}. ${name}${m.keterangan ? ` (${m.keterangan})` : ''}\n`;
+      });
+      msg += `\n`;
+    }
+
+    if (alpha.length > 0) {
+      msg += `❌ *Alpha/Tanpa Keterangan (${alpha.length}):*\n`;
+      alpha.forEach((m, idx) => {
+        const name = m.nama_panggilan || m.nama;
+        msg += `  ${idx + 1}. ${name}${m.keterangan ? ` (${m.keterangan})` : ''}\n`;
+      });
+      msg += `\n`;
+    }
+
+    // Karena foto sekarang tidak diunggah ke server, kita tidak bisa menyematkan URL foto di teks WA
+    // Foto akan otomatis dilampirkan oleh native share (jika didukung) atau dilewati.
+
+
+    msg += `\n🔗 *Lihat Detail Absensi:* https://absensi.ppmawar.or.id/dashboard/absen\n`;
+    msg += `\n_Diinput melalui Sistem Absensi Online PPMA_\n_https://absensi.ppmawar.or.id_`;
+    return msg;
+  };
+
+  const handleShareToWA = async () => {
+    const text = generateWaGroupMessage();
+    
+    // Attempt native share if supported (for mobile devices to attach the photo natively)
+    if (navigator.canShare) {
+      try {
+        let filesArray: File[] = [];
+        if (photoUrl) {
+          // Fetch the image to convert it into a File object
+          const response = await fetch(photoUrl);
+          const blob = await response.blob();
+          // Extract filename from URL or use a default
+          const filename = photoUrl.split('/').pop() || 'foto_kehadiran.jpg';
+          const file = new File([blob], filename, { type: blob.type });
+          filesArray.push(file);
+        }
+        
+        const shareData: any = {
+          title: `Laporan Kehadiran ${namaTarget}`,
+          text: text,
+        };
+        
+        if (filesArray.length > 0) {
+          shareData.files = filesArray;
+        }
+
+        // Test if the system can share this payload
+        if (navigator.canShare(shareData)) {
+          await navigator.share(shareData);
+          return; // Success, we don't need to do anything else
+        }
+      } catch (err) {
+        console.log('Native share failed or cancelled:', err);
+        // Fallback to URL if it fails
+      }
+    }
+    
+    // Fallback: regular WhatsApp Web/App URL
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   const handleSave = async () => {
@@ -93,7 +208,8 @@ function InputAbsenContent() {
           absensi: murid.map(m => ({
             murid_id: m.murid_id,
             status: m.status,
-            keterangan: m.keterangan
+            keterangan: m.keterangan,
+            nama_panggilan: m.nama_panggilan
           })),
           lokasi_lat: location?.lat,
           lokasi_lng: location?.lng
@@ -101,8 +217,7 @@ function InputAbsenContent() {
       });
       const data = await res.json();
       if (data.success) {
-        alert('Absensi berhasil disimpan!');
-        router.push('/dashboard/absen');
+        setIsSuccess(true);
       } else {
         alert('Gagal: ' + data.error);
       }
@@ -114,6 +229,34 @@ function InputAbsenContent() {
   };
 
   if (loading) return <div className="text-center py-20 text-gray-500 font-bold animate-pulse">Memuat data santri...</div>;
+
+  if (isSuccess) {
+    return (
+      <div className="max-w-xl mx-auto p-8 text-center bg-white dark:bg-gray-800 rounded-3xl mt-10 shadow-lg border border-gray-100 dark:border-gray-700 animate-[slideDown_0.3s_ease-out]">
+        <div className="w-20 h-20 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center mx-auto mb-6">
+          <CheckCircle size={48} className="text-green-600 dark:text-green-400" />
+        </div>
+        <h2 className="text-2xl font-extrabold text-gray-800 dark:text-gray-200 mb-2">Absensi Berhasil Disimpan!</h2>
+        <p className="text-gray-600 dark:text-gray-400 mb-8">Data kehadiran santri telah berhasil masuk ke sistem.</p>
+        
+        <div className="space-y-3">
+          <button
+            onClick={handleShareToWA}
+            type="button"
+            className="w-full bg-[#128C7E] hover:bg-[#075E54] text-white px-6 py-4 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-md flex items-center justify-center gap-2"
+          >
+            Kirim Laporan & Foto ke Grup WA
+          </button>
+          <Link href={`/dashboard/notifikasi?kegiatan=${tipe}&kelas=${kelas_id}`} className="block w-full bg-[#25D366] hover:bg-[#1DA851] text-white px-6 py-4 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-md flex items-center justify-center gap-2">
+            Lanjut Kirim Pesan WA Wali Murid
+          </Link>
+          <Link href="/dashboard/absen" className="block w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 px-6 py-4 rounded-xl font-bold transition-colors">
+            Kembali ke Jadwal
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (errorMsg || locationError) return (
     <div className="max-w-3xl mx-auto p-6 text-center bg-red-50 dark:bg-red-900/20 rounded-3xl mt-10">
@@ -141,7 +284,7 @@ function InputAbsenContent() {
         </div>
         <div className="relative z-10 mt-8">
           <h1 className="text-2xl font-extrabold text-indigo-800 dark:text-indigo-400 drop-shadow-sm flex items-center gap-2">
-            Input Absensi Kelas
+            Input Absensi: {namaTarget}
           </h1>
           <p className="text-indigo-600 dark:text-indigo-300 text-sm mt-1 font-medium max-w-md">
             Silakan centang kehadiran santri di bawah ini.
@@ -149,25 +292,67 @@ function InputAbsenContent() {
         </div>
       </div>
 
+      {/* Upload Foto Kehadiran */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 space-y-3 animate-in fade-in slide-in-from-left-4 duration-300">
+        <label className="block text-sm font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2">
+          <Camera size={18} className="text-indigo-600 dark:text-indigo-400 animate-pulse" />
+          Foto Kehadiran Kelas/Kamar (Opsional)
+        </label>
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handlePhotoUpload}
+            className="hidden"
+            id="presence-photo-input"
+          />
+          <label
+            htmlFor="presence-photo-input"
+            className="cursor-pointer bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-bold px-5 py-3 rounded-xl border border-indigo-200 dark:border-indigo-800 text-sm transition-all flex items-center gap-2"
+          >
+            {uploadingPhoto ? 'Mengunggah...' : photoUrl ? 'Ganti Foto' : 'Ambil/Unggah Foto'}
+          </label>
+          
+          {photoUrl && (
+            <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+              <img src={photoUrl} alt="Preview" className="w-full h-full object-cover" />
+              <button 
+                type="button" 
+                onClick={() => setPhotoUrl('')}
+                className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 shadow-sm transition-colors text-[10px] w-5 h-5 flex items-center justify-center font-bold"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+        </div>
+        <p className="text-xs text-gray-400 font-medium">
+          Guru tugas/pengurus dapat langsung mengambil foto suasana kelas/kamar menggunakan kamera HP.
+        </p>
+      </div>
+
       <div className="flex justify-end gap-2 mb-4 animate-in fade-in slide-in-from-right-4 duration-300">
         <button onClick={() => setAllStatus('Hadir')} className="text-xs bg-green-100 hover:bg-green-200 text-green-800 dark:bg-green-900/30 dark:text-green-400 font-bold py-2 px-4 rounded-xl transition-colors">Semua Hadir</button>
         <button onClick={() => setAllStatus('Alpha')} className="text-xs bg-red-100 hover:bg-red-200 text-red-800 dark:bg-red-900/30 dark:text-red-400 font-bold py-2 px-4 rounded-xl transition-colors">Semua Alpha</button>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+      {/* Tampilan Desktop (Tabel) */}
+      <div className="hidden md:block bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 font-bold border-b border-gray-100 dark:border-gray-700">
               <tr>
                 <th className="px-4 py-4 w-10 text-center">NO</th>
                 <th className="px-4 py-4">NAMA SANTRI</th>
+                <th className="px-4 py-4">NAMA PANGGILAN</th>
                 <th className="px-4 py-4 text-center">KEHADIRAN</th>
                 <th className="px-4 py-4">KETERANGAN</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {murid.length === 0 ? (
-                <tr><td colSpan={4} className="text-center py-8 text-gray-500">Tidak ada data santri di kelas ini.</td></tr>
+                <tr><td colSpan={5} className="text-center py-8 text-gray-500">Tidak ada data santri di kelas ini.</td></tr>
               ) : (
                 murid.map((item, index) => (
                   <tr key={item.murid_id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
@@ -175,6 +360,15 @@ function InputAbsenContent() {
                     <td className="px-4 py-3">
                       <div className="font-bold text-gray-900 dark:text-white">{item.nama}</div>
                       <div className="text-xs text-gray-400 font-mono">{item.nis || '-'}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="text"
+                        placeholder="Panggilan..."
+                        value={item.nama_panggilan || ''}
+                        onChange={(e) => handleNamaPanggilanChange(item.murid_id, e.target.value)}
+                        className="w-full max-w-[120px] px-3 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-700 dark:text-indigo-300"
+                      />
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="inline-flex bg-gray-100 dark:bg-gray-900 rounded-lg p-1 gap-1">
@@ -213,6 +407,73 @@ function InputAbsenContent() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Tampilan Mobile (Kartu Bertumpuk) */}
+      <div className="block md:hidden space-y-4">
+        {murid.length === 0 ? (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 text-center text-gray-500 border border-gray-100 dark:border-gray-700">Tidak ada data santri di kelas ini.</div>
+        ) : (
+          murid.map((item, index) => (
+            <div key={item.murid_id} className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 space-y-3.5">
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="font-extrabold text-gray-900 dark:text-white flex items-center gap-1.5">
+                    <span className="text-gray-400 text-xs font-semibold">{index + 1}.</span>
+                    {item.nama}
+                  </div>
+                  <div className="text-xs text-gray-400 font-mono mt-0.5 ml-3.5">NIS: {item.nis || '-'}</div>
+                </div>
+              </div>
+
+              {/* Input Nama Panggilan Mobile */}
+              <div className="ml-3.5 flex items-center gap-2">
+                <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0 font-medium">Nama Panggilan:</span>
+                <input
+                  type="text"
+                  placeholder="Panggilan..."
+                  value={item.nama_panggilan || ''}
+                  onChange={(e) => handleNamaPanggilanChange(item.murid_id, e.target.value)}
+                  className="w-full max-w-[180px] px-2.5 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-700 dark:text-indigo-300"
+                />
+              </div>
+
+              {/* Grid Status Kehadiran Mobile */}
+              <div className="grid grid-cols-4 gap-1.5 bg-gray-100 dark:bg-gray-900 rounded-xl p-1">
+                {['Hadir', 'Izin', 'Sakit', 'Alpha'].map(status => (
+                  <button
+                    key={status}
+                    type="button"
+                    onClick={() => handleStatusChange(item.murid_id, status)}
+                    className={`py-2 text-xs font-bold rounded-lg transition-all text-center ${
+                      item.status === status 
+                        ? status === 'Hadir' ? 'bg-green-500 text-white shadow-sm'
+                        : status === 'Izin' ? 'bg-blue-500 text-white shadow-sm'
+                        : status === 'Sakit' ? 'bg-orange-500 text-white shadow-sm'
+                        : 'bg-red-500 text-white shadow-sm'
+                        : 'text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-800/50'
+                    }`}
+                  >
+                    {status}
+                  </button>
+                ))}
+              </div>
+
+              {/* Catatan (hanya jika bukan Hadir) */}
+              {item.status !== 'Hadir' && (
+                <div className="ml-0.5">
+                  <input
+                    type="text"
+                    placeholder="Masukkan catatan (alasan izin/sakit/keterangan)..."
+                    value={item.keterangan || ''}
+                    onChange={(e) => handleKeteranganChange(item.murid_id, e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              )}
+            </div>
+          ))
+        )}
       </div>
 
       <div className="fixed bottom-16 sm:bottom-0 left-0 w-full bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 p-4 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] z-40">

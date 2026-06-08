@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Settings, Power, Clock, Save, AlertTriangle, CheckCircle, Bell, RefreshCw, Calendar, Building2, Database, ChevronDown, ChevronUp } from 'lucide-react';
+import { Settings, Power, Clock, Save, AlertTriangle, CheckCircle, Bell, RefreshCw, Calendar, Building2, Database, ChevronDown, ChevronUp, MessageSquare, Sheet, ExternalLink, Loader2 } from 'lucide-react';
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -17,11 +17,13 @@ export default function SettingsPage() {
     lng_pesantren: '',
     radius_absen: 50,
     rutinitas_sinkronisasi: 'manual',
-    terakhir_sinkronisasi: ''
+    terakhir_sinkronisasi: '',
+    nomor_cs: '+628133129223'
   });
 
   useEffect(() => {
     fetchSettings();
+    fetchGSheetStatus();
   }, []);
 
   const fetchSettings = async () => {
@@ -37,7 +39,8 @@ export default function SettingsPage() {
           lng_pesantren: json.data.lng_pesantren || '',
           radius_absen: parseInt(json.data.radius_absen) || 50,
           rutinitas_sinkronisasi: json.data.rutinitas_sinkronisasi || 'manual',
-          terakhir_sinkronisasi: json.data.terakhir_sinkronisasi || ''
+          terakhir_sinkronisasi: json.data.terakhir_sinkronisasi || '',
+          nomor_cs: json.data.nomor_cs || '+628133129223'
         });
       } else {
         setError(json.error || 'Gagal memuat pengaturan');
@@ -84,6 +87,14 @@ export default function SettingsPage() {
   const [syncSuccess, setSyncSuccess] = useState('');
   const [syncInfo, setSyncInfo] = useState<any>(null);
 
+  // Google Sheets Sync
+  const [gsheetSyncing, setGsheetSyncing] = useState(false);
+  const [gsheetError, setGsheetError] = useState('');
+  const [gsheetSuccess, setGsheetSuccess] = useState('');
+  const [gsheetResults, setGsheetResults] = useState<any>(null);
+  const [lastGSheetSync, setLastGSheetSync] = useState<string | null>(null);
+  const [spreadsheetUrl, setSpreadsheetUrl] = useState<string>('');
+
   // Setup Asrama
   const [showSetupAsrama, setShowSetupAsrama] = useState(false);
   const [asramaData, setAsramaData] = useState<any>(null);
@@ -91,6 +102,40 @@ export default function SettingsPage() {
   const [fixingAsrama, setFixingAsrama] = useState(false);
   const [fixAsramaResult, setFixAsramaResult] = useState<any>(null);
   const [fixAsramaError, setFixAsramaError] = useState('');
+
+  const fetchGSheetStatus = async () => {
+    try {
+      const res = await fetch('/api/sync/status');
+      const json = await res.json();
+      if (json.success) {
+        setLastGSheetSync(json.last_sync);
+        setSpreadsheetUrl(json.spreadsheet_url || '');
+      }
+    } catch { /* abaikan */ }
+  };
+
+  const handleSyncGSheet = async () => {
+    setGsheetSyncing(true);
+    setGsheetError('');
+    setGsheetSuccess('');
+    setGsheetResults(null);
+    try {
+      const res = await fetch('/api/sync/googlesheet', { method: 'POST' });
+      const json = await res.json();
+      if (json.success || json.results) {
+        setGsheetSuccess(json.message || 'Sinkronisasi ke Google Sheets berhasil!');
+        setGsheetResults(json.results);
+        setLastGSheetSync(json.synced_at);
+        if (json.spreadsheet_url) setSpreadsheetUrl(json.spreadsheet_url);
+      } else {
+        setGsheetError(json.error || 'Gagal sinkronisasi ke Google Sheets');
+      }
+    } catch (e) {
+      setGsheetError('Kesalahan jaringan saat sinkronisasi Google Sheets');
+    } finally {
+      setGsheetSyncing(false);
+    }
+  };
 
   const fetchAsramaData = async () => {
     setLoadingAsrama(true);
@@ -206,6 +251,26 @@ export default function SettingsPage() {
         </h2>
 
         <form onSubmit={handleSave} className="space-y-8">
+          <div className="p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 space-y-4">
+            <div>
+              <h3 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                <MessageSquare size={18} className="text-green-500" />
+                Nomor WhatsApp Layanan Pengguna (CS)
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Nomor WhatsApp ini akan ditampilkan sebagai tombol bantuan di seluruh halaman untuk semua pengguna. Gunakan format kode negara (contoh: +6281234...).
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <input 
+                type="text" 
+                value={settings.nomor_cs}
+                onChange={(e) => setSettings({ ...settings, nomor_cs: e.target.value })}
+                className="w-full max-w-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 px-4 py-2 rounded-xl font-bold text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-green-500 transition-all"
+              />
+            </div>
+          </div>
+
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700">
             <div>
               <h3 className="font-bold text-gray-800 dark:text-gray-200 text-lg">Status Absensi Otomatis</h3>
@@ -436,6 +501,137 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Card Google Sheets Sync */}
+      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-700 space-y-6">
+        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2 pb-4 border-b border-gray-100 dark:border-gray-700">
+          <Sheet size={22} className="text-green-600" />
+          Sinkronisasi ke Google Sheets
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Kolom Kiri: Info & Tombol */}
+          <div className="p-5 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-2xl border border-green-200 dark:border-green-800 flex flex-col justify-between space-y-4">
+            <div>
+              <h3 className="font-bold text-gray-800 dark:text-gray-200 text-lg flex items-center gap-2">
+                <Sheet size={18} className="text-green-600" />
+                Sinkronisasi Manual
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                Kirim seluruh data utama (Santri, Guru, Jadwal) dan data log (Rekap Absensi, Ketertiban) ke Google Sheets sekarang juga. Data master akan di-<strong>overwrite</strong>, data log akan di-<strong>append</strong> (tanpa duplikat).
+              </p>
+              {lastGSheetSync && (
+                <div className="mt-3 text-xs font-semibold text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
+                  <Clock size={12} />
+                  Terakhir Sync: {new Date(lastGSheetSync).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
+                </div>
+              )}
+              {!lastGSheetSync && (
+                <div className="mt-3 text-xs font-semibold text-amber-500 flex items-center gap-1.5">
+                  <AlertTriangle size={12} />
+                  Belum pernah disinkronisasi
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={handleSyncGSheet}
+              disabled={gsheetSyncing}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              {gsheetSyncing
+                ? <><Loader2 size={18} className="animate-spin" /> Menyinkronkan...</>
+                : <><Sheet size={18} /> Sinkronkan ke Google Sheets</>}
+            </button>
+          </div>
+
+          {/* Kolom Kanan: Info Sheet & Cron */}
+          <div className="p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 flex flex-col justify-between space-y-4">
+            <div>
+              <h3 className="font-bold text-gray-800 dark:text-gray-200 text-lg flex items-center gap-2">
+                <Calendar size={18} className="text-blue-500" />
+                Struktur Tab di Spreadsheet
+              </h3>
+              <div className="mt-3 space-y-1.5 text-sm">
+                {[
+                  { tab: 'Data_Santri', mode: 'Overwrite', color: 'blue' },
+                  { tab: 'Data_Guru', mode: 'Overwrite', color: 'blue' },
+                  { tab: 'Jadwal', mode: 'Overwrite', color: 'blue' },
+                  { tab: 'Rekap_Absensi', mode: 'Append', color: 'amber' },
+                  { tab: 'Ketertiban', mode: 'Append', color: 'amber' },
+                ].map(item => (
+                  <div key={item.tab} className="flex items-center justify-between">
+                    <span className="font-mono text-xs text-gray-600 dark:text-gray-400">{item.tab}</span>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                      item.color === 'blue'
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                    }`}>{item.mode}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {spreadsheetUrl && (
+              <a
+                href={spreadsheetUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:border-green-500 hover:text-green-600 text-gray-700 dark:text-gray-200 font-bold py-2.5 px-4 rounded-xl text-sm transition-all"
+              >
+                <ExternalLink size={16} /> Buka Google Spreadsheet
+              </a>
+            )}
+          </div>
+        </div>
+
+        {/* Hasil Sinkronisasi */}
+        {gsheetError && (
+          <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-200 text-sm font-semibold flex items-start gap-2">
+            <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">Gagal Sinkronisasi Google Sheets</p>
+              <p className="text-xs opacity-90 mt-0.5">{gsheetError}</p>
+            </div>
+          </div>
+        )}
+
+        {gsheetSuccess && (
+          <div className="bg-green-50 text-green-700 p-4 rounded-xl border border-green-200 text-sm font-semibold space-y-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle size={18} className="shrink-0" />
+              <p className="font-bold">{gsheetSuccess}</p>
+            </div>
+            {gsheetResults && (
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                {Object.entries(gsheetResults).map(([key, val]: [string, any]) => (
+                  <div key={key} className={`p-2 rounded-lg text-center text-xs ${
+                    val.status === 'ok' ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'
+                  }`}>
+                    <div className="font-black text-sm">
+                      {val.status === 'ok' ? '✓' : '✗'}
+                    </div>
+                    <div className="font-bold capitalize mt-0.5">{key}</div>
+                    <div className="text-gray-500 mt-0.5">
+                      {val.rows !== undefined ? `${val.rows} baris` : ''}
+                      {val.appended !== undefined ? `+${val.appended}` : ''}
+                      {val.status === 'error' ? val.message?.substring(0, 30) : ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-sm text-blue-700 dark:text-blue-300 flex gap-3">
+          <Bell size={18} className="shrink-0 mt-0.5" />
+          <div>
+            <strong>Sinkronisasi Otomatis:</strong> Untuk mengaktifkan cron job harian otomatis, panggil endpoint
+            <code className="bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded text-xs mx-1 font-mono">POST /api/sync/googlesheet</code>
+            dengan header <code className="bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded text-xs font-mono">Authorization: Bearer ppma_sync_secret_2024_secure</code> menggunakan layanan cron job eksternal (seperti cron-job.org atau Vercel Cron).
+          </div>
+        </div>
       </div>
 
       {/* Card Setup Asrama - Hanya Admin */}

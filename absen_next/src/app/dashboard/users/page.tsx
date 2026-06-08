@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Users, ShieldAlert, Edit, Trash2, Plus, Search, Shield, UserCog, User, BookOpen, KeyRound } from 'lucide-react';
+import { Users, ShieldAlert, Edit, Trash2, Plus, Search, Shield, UserCog, User, BookOpen, KeyRound, FileText, Download, X, Fingerprint } from 'lucide-react';
 import Link from 'next/link';
 
 export default function UsersManagementPage() {
@@ -89,6 +89,46 @@ export default function UsersManagementPage() {
     return sortConfig.direction === 'ascending' ? ' ▲' : ' ▼';
   };
 
+  // Export State
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState('');
+
+  const handleExport = (format: 'pdf' | 'excel' = 'pdf', previewOnly = false) => {
+    if (sortedUsers.length === 0) {
+      alert('Tidak ada data untuk di-export.');
+      return;
+    }
+
+    const title = 'DATA PENGGUNA SISTEM';
+    const subtitle = `Filter Role: ${activeTab.toUpperCase()} | Pencarian: ${search || 'Semua'}`;
+    const filename = `Data_Pengguna_${activeTab}`;
+
+    const tableColumn = ["NO", "NAMA PENGGUNA", "USERNAME", "ROLE", "NIP"];
+    const tableRows: any[] = [];
+
+    sortedUsers.forEach((item, idx) => {
+      tableRows.push([
+        idx + 1,
+        item.nama || 'User Tanpa Nama',
+        item.username || '-',
+        item.role || '-',
+        item.nip || '-'
+      ]);
+    });
+
+    if (format === 'excel') {
+      import('@/lib/exportUtils').then(({ exportToExcel }) => exportToExcel({ title, subtitle, columns: tableColumn, rows: tableRows, filename }));
+    } else {
+      import('@/lib/exportUtils').then(({ exportToPDF }) => {
+        const result = exportToPDF({ title, subtitle, columns: tableColumn, rows: tableRows, filename, previewOnly });
+        if (previewOnly && result) {
+          setPdfUrl(result);
+          setShowPdfPreview(true);
+        }
+      });
+    }
+  };
+
   const handleOpenModal = (user: any = null) => {
     if (user) {
       setEditingId(user.id);
@@ -136,6 +176,26 @@ export default function UsersManagementPage() {
       }
     } catch (err) {
       alert('Terjadi kesalahan jaringan');
+    }
+  };
+
+  const handleResetFingerprint = async (id: number, nama: string) => {
+    if (!confirm(`Hapus/reset data sidik jari untuk ${nama}?`)) return;
+    try {
+      const res = await fetch('/api/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, reset_fingerprint: true })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message);
+        fetchUsers();
+      } else {
+        alert(data.error);
+      }
+    } catch (err) {
+      alert('Gagal mereset sidik jari');
     }
   };
 
@@ -220,14 +280,24 @@ export default function UsersManagementPage() {
                 className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 transition-all"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 shrink-0 overflow-x-auto pb-2 sm:pb-0">
+              <button onClick={() => handleExport('pdf', true)} className="px-3 py-2 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-xl text-xs font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-1.5 shrink-0" title="Preview PDF">
+                <FileText size={14} /> Preview
+              </button>
+              <button onClick={() => handleExport('pdf', false)} className="px-3 py-2 bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors flex items-center gap-1.5 shrink-0" title="Export PDF">
+                <Download size={14} /> PDF
+              </button>
+              <button onClick={() => handleExport('excel', false)} className="px-3 py-2 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800 rounded-xl text-xs font-bold hover:bg-green-100 transition-colors flex items-center gap-1.5 shrink-0" title="Export Excel">
+                <Download size={14} /> Excel
+              </button>
+
               {(activeTab === 'pengelola' || activeTab === 'guru' || activeTab === 'pengurus_asrama') && (
                 <button
                   onClick={() => handleOpenModal()}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-full shadow-sm transition-transform hover:scale-105 flex items-center justify-center font-bold"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 rounded-xl shadow-sm transition-transform hover:scale-105 flex items-center justify-center font-bold gap-2 shrink-0"
                   title={`Tambah ${activeTab === 'pengelola' ? 'Pengelola' : activeTab === 'pengurus_asrama' ? 'Pengurus Asrama' : 'Guru'}`}
                 >
-                  <Plus size={20} />
+                  <Plus size={16} /> <span className="hidden sm:inline">Tambah</span>
                 </button>
               )}
             </div>
@@ -277,6 +347,11 @@ export default function UsersManagementPage() {
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex justify-center items-center gap-2">
+                          {u.has_fingerprint > 0 && (
+                            <button onClick={() => handleResetFingerprint(u.id, u.nama || u.username)} title="Reset Sidik Jari" className="p-2 text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors">
+                              <Fingerprint size={16} />
+                            </button>
+                          )}
                           <button onClick={() => handleOpenModal(u)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
                             <Edit size={16} />
                           </button>
@@ -369,6 +444,70 @@ export default function UsersManagementPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Preview Modal */}
+      {showPdfPreview && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-5xl h-[85vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-[slideUp_0.3s_ease-out]">
+            <div className="flex justify-between items-center p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+              <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                <FileText className="text-indigo-500" size={20} />
+                Preview PDF Data Pengguna
+              </h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleExport('pdf', false)}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl text-sm transition-colors flex items-center gap-2"
+                >
+                  <Download size={16} /> Download
+                </button>
+                <button
+                  onClick={() => setShowPdfPreview(false)}
+                  className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 p-2 rounded-xl transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            {/* Desktop: iframe preview */}
+            <div className="hidden md:block flex-1 bg-gray-200 dark:bg-black/50 p-4 h-full">
+              <iframe 
+                src={pdfUrl} 
+                className="w-full h-full rounded-xl shadow-inner bg-white"
+                title="PDF Preview"
+                style={{ minHeight: '60vh' }}
+              />
+            </div>
+            {/* Mobile: fallback card */}
+            <div className="flex md:hidden flex-1 flex-col items-center justify-center gap-5 p-8 bg-gray-50 dark:bg-gray-900/50">
+              <div className="w-20 h-20 bg-indigo-100 dark:bg-indigo-900/40 rounded-full flex items-center justify-center">
+                <FileText size={40} className="text-indigo-500" />
+              </div>
+              <div className="text-center">
+                <p className="font-bold text-gray-700 dark:text-gray-200 mb-1">Preview PDF tidak tersedia di HP</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Browser HP tidak mendukung tampilan PDF dalam aplikasi. Gunakan tombol di bawah untuk membuka atau mengunduh file PDF.</p>
+              </div>
+              <div className="flex flex-col gap-3 w-full max-w-xs">
+                <a
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-md transition-colors"
+                >
+                  <FileText size={18} /> Buka di Tab Baru
+                </a>
+                <a
+                  href={pdfUrl}
+                  download
+                  className="flex items-center justify-center gap-2 w-full py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold rounded-2xl transition-colors"
+                >
+                  <Download size={18} /> Unduh PDF
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -19,7 +19,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const roleFilter = searchParams.get('role'); // 'pengelola', 'guru', 'wali_murid'
 
-    let query = 'SELECT users.id, users.username, users.role, users.nama, users.nip, users.murid_id, users.kamar_id, kamar.nama_kamar FROM users LEFT JOIN kamar ON users.kamar_id = kamar.kamar_id';
+    let query = `
+      SELECT users.id, users.username, users.role, users.nama, users.nip, users.murid_id, users.kamar_id, kamar.nama_kamar,
+             (SELECT COUNT(*) FROM webauthn_credentials wc WHERE wc.user_id = users.id) as has_fingerprint
+      FROM users 
+      LEFT JOIN kamar ON users.kamar_id = kamar.kamar_id
+    `;
     let params: any[] = [];
 
     if (roleFilter === 'pengelola') {
@@ -84,9 +89,19 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, username, password, role, nama, nip, kamar_id } = body;
+    const { id, username, password, role, nama, nip, kamar_id, reset_fingerprint } = body;
 
-    if (!id || !username || !role || !nama) {
+    if (!id) {
+      return NextResponse.json({ error: 'ID tidak valid' }, { status: 400 });
+    }
+
+    // Biometric reset action
+    if (reset_fingerprint) {
+      await pool.execute('DELETE FROM webauthn_credentials WHERE user_id = ?', [id]);
+      return NextResponse.json({ success: true, message: 'Sidik jari/Biometrik berhasil direset' });
+    }
+
+    if (!username || !role || !nama) {
       return NextResponse.json({ error: 'Data tidak lengkap' }, { status: 400 });
     }
 

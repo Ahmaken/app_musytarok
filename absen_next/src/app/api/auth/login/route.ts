@@ -6,7 +6,32 @@ import { RowDataPacket } from 'mysql2';
 
 export async function POST(request: Request) {
   try {
-    const { username, password } = await request.json();
+    const body = await request.json();
+
+    // === Mode Tamu (Guest Login) ===
+    if (body.guest === true) {
+      const payload = {
+        userId: 0,
+        username: 'Tamu',
+        role: 'tamu',
+        guruId: null,
+        muridId: null,
+        kamarId: null,
+        namaAsrama: null
+      };
+      const token = signToken(payload);
+      const response = NextResponse.json({ success: true, message: 'Masuk sebagai tamu', user: payload });
+      response.cookies.set('token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 2 // 2 jam untuk tamu
+      });
+      return response;
+    }
+
+    const { username, password } = body;
 
     if (!username || !password) {
       return NextResponse.json({ error: 'Username dan Password wajib diisi' }, { status: 400 });

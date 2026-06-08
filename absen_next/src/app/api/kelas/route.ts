@@ -52,13 +52,13 @@ export async function GET(request: Request) {
           whereClause = `WHERE k.kelas_id IN (SELECT DISTINCT m.kelas_madin_id FROM murid m JOIN kamar km ON m.kamar_id = km.kamar_id WHERE km.nama_asrama = ? AND m.kelas_madin_id IS NOT NULL)`;
           params = [namaAsrama];
         } else if (actualType === 'quran') {
-          // Pengurus asrama hanya dapat melihat kelas quran yang ada santri dari asramanya
+          // Pengurus asrama hanya dapat melihat kelas quran yang ada santri dari asramanya ATAU nama_kelas mengandung nama asrama
           whereClause = `WHERE k.id IN (
             SELECT DISTINCT m.kelas_quran_id FROM murid m
             JOIN kamar km ON m.kamar_id = km.kamar_id
             WHERE km.nama_asrama = ? AND m.kelas_quran_id IS NOT NULL
-          )`;
-          params = [namaAsrama];
+          ) OR k.nama_kelas LIKE ?`;
+          params = [namaAsrama, `%${namaAsrama}%`];
         } else if (actualType === 'kamar') {
           whereClause = `WHERE k.nama_asrama = ?`;
           params = [namaAsrama];
@@ -104,7 +104,7 @@ export async function GET(request: Request) {
       `;
     } else if (actualType === 'kamar') {
       query = `
-        SELECT k.kamar_id as id, k.nama_kamar as nama, g.nama as pembina,
+        SELECT k.kamar_id as id, k.nama_kamar as nama, k.nama_asrama, g.nama as pembina,
                (SELECT COUNT(*) FROM murid m WHERE m.kamar_id = k.kamar_id) as jumlah_murid
         FROM kamar k
         LEFT JOIN guru g ON k.guru_id = g.guru_id

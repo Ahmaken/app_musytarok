@@ -84,13 +84,15 @@ export async function GET() {
         )`;
         paramsMadin.push(namaAsrama);
 
-        // Hanya jadwal quran yang ada santri dari asrama ini (filter per asrama)
-        queryQuran += ` AND j.kelas_quran_id IN (
+        // Hanya jadwal quran yang ada santri dari asrama ini (filter per asrama) OR nama_kelas mengandung nama asrama
+        queryQuran += ` AND (j.kelas_quran_id IN (
           SELECT DISTINCT m.kelas_quran_id FROM murid m
           JOIN kamar km ON m.kamar_id = km.kamar_id
           WHERE km.nama_asrama = ? AND m.kelas_quran_id IS NOT NULL
-        )`;
-        paramsQuran.push(namaAsrama);
+        ) OR j.kelas_quran_id IN (
+          SELECT id FROM kelas_quran WHERE nama_kelas LIKE ?
+        ))`;
+        paramsQuran.push(namaAsrama, `%${namaAsrama}%`);
 
         // Hanya kegiatan untuk kamar di asrama ini
         queryKegiatan += ` AND j.kamar_id IN (

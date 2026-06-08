@@ -47,18 +47,24 @@ export async function GET() {
           JOIN kamar km ON m.kamar_id = km.kamar_id
           WHERE km.nama_asrama = ? AND m.kelas_madin_id IS NOT NULL
         )`;
-        // Jadwal Quran: hanya kelas quran yang ada santri dari asrama ini (bukan lintas asrama)
-        whereClauseQuran = `j.kelas_quran_id IN (
-          SELECT DISTINCT m.kelas_quran_id FROM murid m
-          JOIN kamar km ON m.kamar_id = km.kamar_id
-          WHERE km.nama_asrama = ? AND m.kelas_quran_id IS NOT NULL
+        // Jadwal Quran: kelas yang ada santri dari asrama ini OR nama_kelas mengandung nama asrama
+        whereClauseQuran = `(
+          j.kelas_quran_id IN (
+            SELECT DISTINCT m.kelas_quran_id FROM murid m
+            JOIN kamar km ON m.kamar_id = km.kamar_id
+            WHERE km.nama_asrama = ? AND m.kelas_quran_id IS NOT NULL
+          )
+          OR
+          j.kelas_quran_id IN (
+            SELECT id FROM kelas_quran WHERE nama_kelas LIKE ?
+          )
         )`;
         // Kegiatan: kamar yang masuk asrama ini
         whereClauseKegiatan = `j.kamar_id IN (
           SELECT kamar_id FROM kamar WHERE nama_asrama = ?
         )`;
         paramsMadin = [namaAsrama];
-        paramsQuran = [namaAsrama];
+        paramsQuran = [namaAsrama, `%${namaAsrama}%`];
         paramsKegiatan = [namaAsrama];
       } else {
         whereClauseMadin = '0=1';
@@ -217,6 +223,44 @@ export async function POST(request: Request) {
     await pool.execute(query, params);
 
     return NextResponse.json({ success: true, message: 'Jadwal berhasil ditambahkan' });
+  } catch (error: any) {
+    return NextResponse.json({ error: 'Server error: ' + error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const payload = verifyToken(token) as any;
+    if (!payload || (payload.role !== 'admin' && payload.role !== 'staff')) {
+      return NextResponse.json({ error: 'Forbidden: Hanya admin/staff yang dapat menghapus jadwal' }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    const tipe = searchParams.get('tipe');
+
+    if (!id || !tipe) {
+      return NextResponse.json({ error: 'ID dan tipe jadwal harus disertakan' }, { status: 400 });
+    }
+
+    let query = '';
+    if (tipe === 'madin') {
+      query = `DELETE FROM jadwal_madin WHERE jadwal_id = ?`;
+    } else if (tipe === 'quran') {
+      query = `DELETE FROM jadwal_quran WHERE id = ?`;
+    } else if (tipe === 'kegiatan') {
+      query = `DELETE FROM jadwal_kegiatan WHERE kegiatan_id = ?`;
+    } else {
+      return NextResponse.json({ error: 'Tipe jadwal tidak valid' }, { status: 400 });
+    }
+
+    await pool.execute(query, [id]);
+
+    return NextResponse.json({ success: true, message: 'Jadwal berhasil dihapus' });
   } catch (error: any) {
     return NextResponse.json({ error: 'Server error: ' + error.message }, { status: 500 });
   }

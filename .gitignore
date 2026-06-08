@@ -1,0 +1,10 @@
+# Ignore Google Service Account credentials at the root level
+/*.json
+
+# Ignore generated deployment zips at the root level
+/*.zip
+
+# Ignore specific scratch or temp files at the root level
+/scratch/
+/absen_next/scratch/
+/absen_next/deploy.zip

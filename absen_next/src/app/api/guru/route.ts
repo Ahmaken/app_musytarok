@@ -13,8 +13,9 @@ export async function GET() {
     const payload = verifyToken(token);
     if (!payload) return NextResponse.json({ error: 'Token invalid' }, { status: 401 });
 
-    const { role } = payload as any;
-    
+    const { role, userId, username } = payload as any;
+    const tokenAsrama = (payload as any).namaAsrama || null;
+
     let query = `SELECT guru_id, nip, nama, jenis_kelamin, jabatan, alamat, no_hp as whatsapp, foto FROM guru`;
     let params: any[] = [];
 
@@ -26,7 +27,21 @@ export async function GET() {
       } else {
         query += ` WHERE 0=1`;
       }
+    } else if (role === 'pengurus_asrama') {
+      // Pengurus asrama melihat seluruh pembina kamar (guru) yang bertugas di asramanya
+      const { resolveAsrama } = await import('@/lib/auth/resolveAsrama');
+      const namaAsrama = await resolveAsrama(userId, role, username || '', tokenAsrama);
+      if (namaAsrama) {
+        query += ` WHERE guru_id IN (
+          SELECT guru_id FROM kamar
+          WHERE nama_asrama = ? AND guru_id IS NOT NULL
+        )`;
+        params.push(namaAsrama);
+      } else {
+        query += ` WHERE 0=1`;
+      }
     } else if (role !== 'admin' && role !== 'staff') {
+      // Wali murid — hanya melihat guru yang terkait dengan santrinya
       const muridId = (payload as any).muridId;
       if (muridId) {
         query += ` WHERE guru_id IN (
@@ -44,10 +59,10 @@ export async function GET() {
         )`;
         params.push(muridId, muridId, muridId, muridId, muridId, muridId);
       } else {
-        query += ` WHERE 0=1`; 
+        query += ` WHERE 0=1`;
       }
     }
-    
+
     query += ` ORDER BY nama ASC`;
 
     const [rows] = await pool.execute<RowDataPacket[]>(query, params);

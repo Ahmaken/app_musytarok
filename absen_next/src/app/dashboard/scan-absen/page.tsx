@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import Script from 'next/script';
-import { Camera, CheckCircle, XCircle, QrCode, Shield, Wifi, RefreshCw, ChevronDown } from 'lucide-react';
+import { Camera, CheckCircle, XCircle, QrCode, Shield, Wifi, RefreshCw, ChevronDown, FlipHorizontal } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 
 export default function ScanAbsenPage() {
@@ -13,10 +12,14 @@ export default function ScanAbsenPage() {
   const [popup, setPopup] = useState<{ type: 'success' | 'error' | 'warning', title: string, text: string } | null>(null);
   const [lastScan, setLastScan] = useState<{ nama: string; waktu: string } | null>(null);
   
+  // Kamera: 'environment' = kamera belakang (default), 'user' = kamera depan
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+  const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
+  
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
+  const cameraContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    // Cek apakah koneksi HTTP (bukan localhost dan bukan https)
     if (typeof window !== 'undefined') {
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       const isHttps = window.location.protocol === 'https:';
@@ -25,66 +28,103 @@ export default function ScanAbsenPage() {
       }
     }
 
-    // Fetch unique kegiatan names
     fetch('/api/kegiatan/list')
       .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setKegiatanList(data.kegiatan);
-        }
-      })
+      .then(data => { if (data.success) setKegiatanList(data.kegiatan); })
       .catch(console.error);
   }, []);
 
+  // Helper: hentikan scanner yang sedang berjalan
+  const stopScannerInternal = async () => {
+    if (html5QrCodeRef.current) {
+      try {
+        const state = html5QrCodeRef.current.getState();
+        // State 2 = SCANNING, State 3 = PAUSED
+        if (state === 2 || state === 3) {
+          await html5QrCodeRef.current.stop();
+        }
+        html5QrCodeRef.current.clear();
+      } catch (e) {
+        console.warn('Gagal menghentikan scanner:', e);
+      }
+      html5QrCodeRef.current = null;
+    }
+  };
+
+  // Helper: mulai scanner dengan facingMode tertentu
+  const startScannerInternal = async (facing: 'environment' | 'user') => {
+    try {
+      // Pastikan elemen #reader tersedia di DOM
+      const readerEl = document.getElementById('reader');
+      if (!readerEl) return;
+
+      html5QrCodeRef.current = new Html5Qrcode('reader');
+      await html5QrCodeRef.current.start(
+        { facingMode: facing },
+        { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+        (decodedText) => {
+          stopScanner();
+          handleScan(decodedText);
+        },
+        () => { /* Abaikan error tiap frame */ }
+      );
+    } catch (err) {
+      console.error('Inisialisasi kamera gagal:', err);
+      setIsScanning(false);
+      setPopup({
+        type: 'error',
+        title: 'Akses Kamera Gagal',
+        text: 'Kamera tidak ditemukan atau izin belum diberikan. Pastikan Anda mengakses via HTTPS dan sudah mengizinkan kamera.'
+      });
+    }
+  };
+
+  // Efek: jalankan scanner saat isScanning berubah menjadi true
   useEffect(() => {
     if (isScanning) {
-      const initScanner = async () => {
-        try {
-          if (!html5QrCodeRef.current) {
-            html5QrCodeRef.current = new Html5Qrcode("reader");
-          }
-          await html5QrCodeRef.current.start(
-            { facingMode: "environment" },
-            { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
-            (decodedText) => {
-              stopScanner();
-              handleScan(decodedText);
-            },
-            () => {
-              // Abaikan error pada tiap frame scan
-            }
-          );
-        } catch (err) {
-          console.error(err);
-          setIsScanning(false);
-          setPopup({ type: 'error', title: 'Akses Kamera Gagal', text: 'Kamera tidak ditemukan atau izin belum diberikan.' });
-        }
-      };
-      
-      initScanner();
+      // Tunggu sebentar agar DOM (elemen #reader) selesai dirender
+      const timer = setTimeout(() => {
+        startScannerInternal(facingMode);
+      }, 150);
+      return () => clearTimeout(timer);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isScanning]);
 
   const startScanner = () => {
     if (typeof window === 'undefined') return;
     setIsScanning(true);
+    setTimeout(() => {
+      cameraContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
   };
 
   const stopScanner = () => {
     setIsScanning(false);
-    if (html5QrCodeRef.current) {
-      html5QrCodeRef.current.stop().then(() => {
-        html5QrCodeRef.current?.clear();
-      }).catch(err => {
-        console.error("Gagal menghentikan scanner", err);
-      });
-    }
+    stopScannerInternal();
   };
 
+  // Toggle antara kamera depan dan belakang
+  const switchCamera = async () => {
+    if (isSwitchingCamera) return;
+    setIsSwitchingCamera(true);
+    
+    const newFacing = facingMode === 'environment' ? 'user' : 'environment';
+    
+    // Hentikan kamera yang sedang berjalan
+    await stopScannerInternal();
+    setFacingMode(newFacing);
+    
+    // Tunggu sebentar lalu mulai kembali dengan kamera baru
+    setTimeout(async () => {
+      await startScannerInternal(newFacing);
+      setIsSwitchingCamera(false);
+    }, 400);
+  };
+
+  // Cleanup saat komponen di-unmount
   useEffect(() => {
-    return () => {
-      stopScanner();
-    };
+    return () => { stopScannerInternal(); };
   }, []);
 
   const handleScan = async (barcodeData: string) => {
@@ -161,7 +201,6 @@ export default function ScanAbsenPage() {
           </div>
           <p className="text-green-200 text-sm">Scan kartu QR santri/pengurus untuk absensi otomatis.</p>
           
-          {/* Riwayat scan terakhir */}
           {lastScan && (
             <div className="mt-4 bg-white/15 backdrop-blur-sm rounded-2xl p-3 flex items-center gap-3">
               <CheckCircle size={20} className="text-green-300 flex-shrink-0" />
@@ -218,24 +257,57 @@ export default function ScanAbsenPage() {
             Buka Kamera & Mulai Scan
           </button>
         ) : (
-          <div className="space-y-3 animate-[zoomIn_0.3s_ease-out]">
+          <div ref={cameraContainerRef} className="space-y-3 animate-[zoomIn_0.3s_ease-out]">
             {/* Header kamera */}
             <div className="flex justify-between items-center bg-gray-900 dark:bg-black p-3 rounded-t-2xl text-white">
               <span className="font-bold text-sm flex items-center gap-2">
                 <Camera size={16} className="animate-pulse text-red-400" />
                 Arahkan ke QR Code Kartu
               </span>
-              <button 
-                onClick={stopScanner} 
-                className="bg-red-500 hover:bg-red-600 p-1.5 rounded-lg transition-colors"
-                aria-label="Tutup Kamera"
-              >
-                <XCircle size={18} />
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Tombol Toggle Kamera Depan/Belakang */}
+                <button
+                  onClick={switchCamera}
+                  disabled={isSwitchingCamera}
+                  className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl transition-all ${
+                    isSwitchingCamera
+                      ? 'bg-gray-600 text-gray-400 cursor-wait'
+                      : 'bg-blue-600 hover:bg-blue-500 active:scale-95 text-white'
+                  }`}
+                  title={facingMode === 'environment' ? 'Ganti ke Kamera Depan' : 'Ganti ke Kamera Belakang'}
+                >
+                  <FlipHorizontal size={14} className={isSwitchingCamera ? 'animate-spin' : ''} />
+                  <span className="hidden sm:inline">
+                    {isSwitchingCamera ? 'Mengganti...' : facingMode === 'environment' ? 'Kamera Depan' : 'Kamera Belakang'}
+                  </span>
+                </button>
+                {/* Tombol Tutup Kamera */}
+                <button 
+                  onClick={stopScanner} 
+                  className="bg-red-500 hover:bg-red-600 p-1.5 rounded-lg transition-colors"
+                  aria-label="Tutup Kamera"
+                >
+                  <XCircle size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Indikator kamera aktif */}
+            <div className="flex items-center justify-center gap-2 bg-gray-800 py-1.5 -mt-3">
+              <span className={`w-2 h-2 rounded-full ${facingMode === 'environment' ? 'bg-green-400' : 'bg-blue-400'}`} />
+              <span className="text-xs font-semibold text-gray-300">
+                {facingMode === 'environment' ? '📷 Kamera Belakang' : '🤳 Kamera Depan'}
+              </span>
             </div>
 
             {/* Area Kamera */}
             <div className="rounded-b-2xl overflow-hidden border-2 border-green-500 shadow-xl bg-black min-h-[300px] relative">
+              {isSwitchingCamera && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/80 gap-3">
+                  <div className="w-10 h-10 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-white text-sm font-semibold">Mengganti kamera...</span>
+                </div>
+              )}
               <div id="reader" className="w-full h-full"></div>
             </div>
 
@@ -254,6 +326,7 @@ export default function ScanAbsenPage() {
         <p>2. Klik <strong>"Buka Kamera"</strong> lalu arahkan ke QR Code di kartu</p>
         <p>3. Scanner akan otomatis mendeteksi & menyimpan absensi</p>
         <p>4. Klik <strong>"Scan Berikutnya"</strong> untuk lanjut ke santri berikutnya</p>
+        <p className="mt-1 text-blue-600 dark:text-blue-400">📱 Gunakan tombol <strong>Kamera Depan/Belakang</strong> untuk beralih antar kamera</p>
       </div>
     </div>
   );

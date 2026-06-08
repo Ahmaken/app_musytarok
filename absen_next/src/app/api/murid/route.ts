@@ -46,7 +46,24 @@ export async function GET(request: Request) {
       }
     } else if (role === 'pengurus_asrama') {
       if (namaAsrama) {
-        // Pengurus asrama melihat santri di asramanya sendiri, ATAU santri lintas asrama yang terdaftar di kelas Qur'an yang diikuti oleh santri dari asramanya
+        // Tentukan jenis kelamin target berdasarkan nama asrama
+        let targetGender: string | null = null;
+        const asramaLower = namaAsrama.toLowerCase();
+        if (asramaLower.includes('asrama a') || asramaLower === 'a') {
+          targetGender = 'Laki-laki';
+        } else if (
+          asramaLower.includes('asrama b') ||
+          asramaLower.includes('asrama c') ||
+          asramaLower.includes('asrama d') ||
+          asramaLower.includes('asrama e') ||
+          asramaLower.includes('asrama f') ||
+          ['b', 'c', 'd', 'e', 'f'].includes(asramaLower.trim())
+        ) {
+          targetGender = 'Perempuan';
+        }
+
+        // Pengurus asrama melihat santri di asramanya sendiri, ATAU santri lintas asrama yang terdaftar di kelas Qur'an yang diikuti oleh santri dari asramanya,
+        // ATAU santri yang belum terpetakan (kamar, madin, atau quran) yang berjenis kelamin sesuai gender target asrama
         whereClause = `(
           m.kamar_id IN (SELECT kamar_id FROM kamar WHERE nama_asrama = ?)
           OR m.kelas_quran_id IN (
@@ -55,8 +72,15 @@ export async function GET(request: Request) {
             JOIN kamar km2 ON m2.kamar_id = km2.kamar_id 
             WHERE km2.nama_asrama = ? AND m2.kelas_quran_id IS NOT NULL
           )
+          OR m.kelas_quran_id IN (
+            SELECT id FROM kelas_quran WHERE nama_kelas LIKE ?
+          )
+          ${targetGender ? 'OR ((m.kamar_id IS NULL OR m.kelas_madin_id IS NULL OR m.kelas_quran_id IS NULL) AND m.jenis_kelamin = ?)' : ''}
         )`;
-        queryParams = [namaAsrama, namaAsrama];
+        queryParams = [namaAsrama, namaAsrama, `%${namaAsrama}%`];
+        if (targetGender) {
+          queryParams.push(targetGender);
+        }
       } else {
         whereClause = '0=1';
       }
@@ -131,7 +155,7 @@ export async function PUT(request: Request) {
     const { 
       murid_id, murid_ids, 
       kelas_madin_id, kelas_quran_id, kamar_id,
-      nama, nama_panggilan, nis, nik, no_hp, alamat, nama_wali, no_wali, nilai, foto, barcode_id
+      nama, nama_panggilan, nis, nik, no_hp, alamat, nama_wali, no_wali, nilai, foto, barcode_id, jenis_kelamin
     } = data;
 
     const idsToUpdate = murid_ids || (murid_id ? [murid_id] : []);
@@ -149,14 +173,20 @@ export async function PUT(request: Request) {
          WHERE murid_id IN (${placeholders})
          AND kamar_id NOT IN (SELECT kamar_id FROM kamar WHERE nama_asrama = ?)
          AND (
-           kelas_quran_id IS NULL OR kelas_quran_id NOT IN (
-             SELECT DISTINCT m2.kelas_quran_id 
-             FROM murid m2 
-             JOIN kamar km2 ON m2.kamar_id = km2.kamar_id 
-             WHERE km2.nama_asrama = ? AND m2.kelas_quran_id IS NOT NULL
+           kelas_quran_id IS NULL OR (
+             kelas_quran_id NOT IN (
+               SELECT DISTINCT m2.kelas_quran_id 
+               FROM murid m2 
+               JOIN kamar km2 ON m2.kamar_id = km2.kamar_id 
+               WHERE km2.nama_asrama = ? AND m2.kelas_quran_id IS NOT NULL
+             )
+             AND
+             kelas_quran_id NOT IN (
+               SELECT id FROM kelas_quran WHERE nama_kelas LIKE ?
+             )
            )
          )`,
-        [...idsToUpdate, namaAsrama, namaAsrama]
+        [...idsToUpdate, namaAsrama, namaAsrama, `%${namaAsrama}%`]
       );
       
       if (inaccessible.length > 0) {
@@ -189,6 +219,7 @@ export async function PUT(request: Request) {
     appendUpdate('no_wali', no_wali);
     appendUpdate('nilai', nilai);
     appendUpdate('foto', foto);
+    appendUpdate('jenis_kelamin', jenis_kelamin);
 
     if (updates.length > 0) {
       const placeholders = idsToUpdate.map(() => '?').join(',');

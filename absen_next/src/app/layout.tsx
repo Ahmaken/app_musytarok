@@ -1,14 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Cairo } from "next/font/google";
 import "./globals.css";
 import PwaProvider from "@/components/PwaProvider";
-
-const cairo = Cairo({
-  weight: ["400", "700"],
-  subsets: ["arabic", "latin"],
-  variable: "--font-cairo",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "Absensi PP. Matholi'ul Anwar",
@@ -50,7 +42,7 @@ export default function RootLayout({
     <html
       lang="id"
       suppressHydrationWarning
-      className={`${cairo.variable} h-full antialiased`}
+      className="h-full antialiased"
     >
       <body className="min-h-full flex flex-col">
         <PwaProvider>{children}</PwaProvider>

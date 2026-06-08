@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     const token = cookieStore.get('token')?.value;
     const payload = token ? verifyToken(token) : null;
     
-    if (!payload || ((payload as any).role !== 'admin' && (payload as any).role !== 'staff')) {
+    if (!payload || (payload as any).role === 'wali_murid') {
       return NextResponse.json({ error: 'Akses ditolak' }, { status: 403 });
     }
 
