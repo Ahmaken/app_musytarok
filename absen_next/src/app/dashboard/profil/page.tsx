@@ -143,7 +143,7 @@ export default function ProfilPage() {
             <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
           </label>
         </div>
-        <h2 className="text-2xl font-bold mt-4 capitalize drop-shadow-sm">{user?.username || 'Memuat...'}</h2>
+        <h2 className="text-2xl font-bold mt-4 capitalize drop-shadow-sm">{user?.real_name || user?.username || 'Memuat...'}</h2>
         <p className="text-green-200 text-xs font-medium uppercase tracking-wider mt-1">{user?.role || ''}</p>
       </div>
 
@@ -154,7 +154,7 @@ export default function ProfilPage() {
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Username</label>
               <div className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-3 text-gray-700 dark:text-gray-200 font-medium flex justify-between items-center">
                 {user?.username || '-'}
-                {user?.role !== 'tamu' && (
+                {(user?.role === 'admin' || user?.role === 'staff') && (
                   <button onClick={() => setIsEditing(true)} className="text-green-600 dark:text-green-400 text-xs font-bold hover:underline">
                     UBAH
                   </button>
@@ -196,15 +196,27 @@ export default function ProfilPage() {
           </div>
         ) : (
           <form onSubmit={handleUpdateProfile} className="space-y-4 animate-[fadeIn_0.3s_ease-out]">
-            <div>
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Username Baru</label>
-              <input 
-                type="text" 
-                value={formData.newUsername}
-                onChange={e => setFormData({...formData, newUsername: e.target.value})}
-                className="w-full bg-white dark:bg-gray-900 border border-green-300 dark:border-green-800 focus:ring-2 focus:ring-green-500 rounded-xl p-3 text-gray-800 dark:text-gray-200 outline-none transition"
-              />
-            </div>
+            {(user?.role === 'admin' || user?.role === 'staff') ? (
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Username Baru</label>
+                <input 
+                  type="text" 
+                  value={formData.newUsername}
+                  onChange={e => setFormData({...formData, newUsername: e.target.value})}
+                  className="w-full bg-white dark:bg-gray-900 border border-green-300 dark:border-green-800 focus:ring-2 focus:ring-green-500 rounded-xl p-3 text-gray-800 dark:text-gray-200 outline-none transition"
+                />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 mb-1">Username</label>
+                <input 
+                  type="text" 
+                  disabled
+                  value={user?.username}
+                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-3 text-gray-400 outline-none cursor-not-allowed"
+                />
+              </div>
+            )}
             <div>
               <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Password Baru <span className="text-gray-400 font-normal">(Kosongkan jika tidak ingin mengubah)</span></label>
               <input 

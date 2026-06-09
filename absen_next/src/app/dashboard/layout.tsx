@@ -20,6 +20,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [activeSchedule, setActiveSchedule] = useState<any>(null);
   const [pendingRemindersCount, setPendingRemindersCount] = useState<number>(0);
   const [pwaInstallable, setPwaInstallable] = useState(false);
+  const [userSchedules, setUserSchedules] = useState<any[]>([]);
 
   const navItems = [
     { name: 'Beranda', href: '/dashboard', icon: Home },
@@ -146,6 +147,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     };
   }, []);
 
+  useEffect(() => {
+    if (user && user.role !== 'admin' && user.role !== 'staff') {
+      fetch('/api/jadwal')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setUserSchedules(data.data);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [user]);
+
+  const hasQuran = userSchedules.some(s => s.tipe === 'quran');
+  const hasMadin = userSchedules.some(s => s.tipe === 'madin');
+  const hasKegiatan = userSchedules.some(s => s.tipe === 'kegiatan');
+
+  const showQuranMadin = user?.role === 'admin' || user?.role === 'staff' || hasQuran || hasMadin;
+  const showKamarAsrama = user?.role === 'admin' || user?.role === 'staff' || hasKegiatan;
+  const showDataSantri = user?.role === 'admin' || user?.role === 'staff' || hasQuran || hasMadin || hasKegiatan;
+  const showDataGuru = user?.role === 'admin' || user?.role === 'staff' || hasQuran || hasMadin || hasKegiatan;
+
   const toggleTheme = () => {
     if (isDark) {
       document.documentElement.classList.remove('dark');
@@ -264,23 +287,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <>
           <div className="fixed inset-0 bg-black/50 z-[60]" onClick={() => setShowSidebar(false)}></div>
           <aside className="fixed top-0 right-0 h-full w-72 bg-white dark:bg-gray-900 shadow-2xl z-[70] flex flex-col">
-        <div className="p-5 border-b dark:border-gray-800 flex justify-between items-center bg-gradient-to-r from-green-800 to-green-900 text-white">
-          <div className="flex items-center gap-3">
-            <div className="bg-white p-1.5 rounded-full"><User size={24} className="text-green-800" /></div>
-            <div>
-              <p className="font-bold leading-tight capitalize">{user?.username || 'Memuat...'}</p>
-              <p className="text-[10px] text-green-200 uppercase">{user?.role || ''}</p>
+            <div className="p-5 border-b dark:border-gray-800 flex justify-between items-center bg-gradient-to-r from-green-800 to-green-900 text-white">
+              <div className="flex items-center gap-3">
+                <div className="bg-white p-1.5 rounded-full"><User size={24} className="text-green-800" /></div>
+                <div>
+                  <p className="font-bold leading-tight capitalize">{user?.real_name || user?.username || 'Memuat...'}</p>
+                  <p className="text-[10px] text-green-200 uppercase">{user?.role || ''}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <button onClick={toggleTheme} className="p-2 hover:bg-white/20 rounded-full transition-colors sm:hidden" aria-label="Toggle Mode Gelap">
+                  {isDark ? <Sun size={18} /> : <Moon size={18} />}
+                </button>
+                <button onClick={() => setShowSidebar(false)} className="p-1.5 hover:bg-white/20 rounded-full transition-colors" aria-label="Tutup Menu">
+                  <X size={20} />
+                </button>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <button onClick={toggleTheme} className="p-2 hover:bg-white/20 rounded-full transition-colors sm:hidden" aria-label="Toggle Mode Gelap">
-              {isDark ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
-            <button onClick={() => setShowSidebar(false)} className="p-1.5 hover:bg-white/20 rounded-full transition-colors" aria-label="Tutup Menu">
-              <X size={20} />
-            </button>
-          </div>
-        </div>
         
           <div className="flex-1 overflow-y-auto py-4">
             
@@ -439,16 +462,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Manajemen Data</p>
           </div>
           <ul className="space-y-1 px-3 mb-6">
-            <li>
-              <Link href="/dashboard/guru" onClick={() => setShowSidebar(false)} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${pathname === '/dashboard/guru' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 font-bold' : 'hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-bold'}`}>
-                <UserCog size={18} /> <span className="text-sm">Data Guru & Pembina</span>
-              </Link>
-            </li>
-            <li>
-              <Link href="/dashboard/murid" onClick={() => setShowSidebar(false)} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${pathname === '/dashboard/murid' ? 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 font-bold' : 'hover:bg-orange-50 dark:hover:bg-orange-900/20 text-orange-600 dark:text-orange-400 font-bold'}`}>
-                <Users size={18} /> <span className="text-sm">Data Santri</span>
-              </Link>
-            </li>
+            {showDataGuru && (
+              <li>
+                <Link href="/dashboard/guru" onClick={() => setShowSidebar(false)} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${pathname === '/dashboard/guru' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 font-bold' : 'hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-bold'}`}>
+                  <UserCog size={18} /> <span className="text-sm">Data Guru & Pembina</span>
+                </Link>
+              </li>
+            )}
+            {showDataSantri && (
+              <li>
+                <Link href="/dashboard/murid" onClick={() => setShowSidebar(false)} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${pathname === '/dashboard/murid' ? 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 font-bold' : 'hover:bg-orange-50 dark:hover:bg-orange-900/20 text-orange-600 dark:text-orange-400 font-bold'}`}>
+                  <Users size={18} /> <span className="text-sm">Data Santri</span>
+                </Link>
+              </li>
+            )}
             {(user?.role === 'admin' || user?.role === 'staff') && (
               <li>
                 <Link href="/dashboard/alumni" onClick={() => setShowSidebar(false)} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${pathname === '/dashboard/alumni' ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-bold' : 'hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600 dark:text-green-400 font-bold'}`}>
@@ -456,16 +483,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </Link>
               </li>
             )}
-            <li>
-              <Link href="/dashboard/kelas" onClick={() => setShowSidebar(false)} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${pathname === '/dashboard/kelas' ? 'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 font-bold' : 'hover:bg-teal-50 dark:hover:bg-teal-900/20 text-teal-600 dark:text-teal-400 font-bold'}`}>
-                <BookOpen size={18} /> <span className="text-sm">Kelas Qur'an & Madin</span>
-              </Link>
-            </li>
-            <li>
-              <Link href="/dashboard/kamar" onClick={() => setShowSidebar(false)} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${pathname === '/dashboard/kamar' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-bold' : 'hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold'}`}>
-                <Home size={18} /> <span className="text-sm">Kamar Asrama</span>
-              </Link>
-            </li>
+            {showQuranMadin && (
+              <li>
+                <Link href="/dashboard/kelas" onClick={() => setShowSidebar(false)} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${pathname === '/dashboard/kelas' ? 'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 font-bold' : 'hover:bg-teal-50 dark:hover:bg-teal-900/20 text-teal-600 dark:text-teal-400 font-bold'}`}>
+                  <BookOpen size={18} /> <span className="text-sm">Manajemen Kelas</span>
+                </Link>
+              </li>
+            )}
+            {showKamarAsrama && (
+              <li>
+                <Link href="/dashboard/kamar" onClick={() => setShowSidebar(false)} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${pathname === '/dashboard/kamar' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-bold' : 'hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold'}`}>
+                  <Home size={18} /> <span className="text-sm">Kamar Asrama</span>
+                </Link>
+              </li>
+            )}
           </ul>
           </>
           )}

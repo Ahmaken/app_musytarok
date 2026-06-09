@@ -56,7 +56,7 @@ export default function TabelJadwalPage() {
   const [kegiatanLevelTab, setKegiatanLevelTab] = useState<string>('kegiatan pagi');
 
   // Lists of secondary options
-  const ASRAMAS_QURAN = ['Asrama A', 'Asrama B', 'Asrama C', 'Asrama D', 'Asrama E', 'Asrama F', 'Tahfidz Putri'];
+  const ASRAMAS_QURAN = ['Asrama A', 'Asrama B', 'Asrama C', 'Asrama D', 'Asrama E', 'Asrama F', 'Tahfidz Putra', 'Tahfidz Putri'];
   const ASRAMAS_KEGIATAN = ['Asrama A', 'Asrama B', 'Asrama C', 'Asrama D', 'Asrama E', 'Asrama F'];
   const LEVELS_QURAN = ['jilid', 'pasca', 'ghorib', 'finishing', 'khotaman', 'juz', 'tahfidz'];
   const LEVELS_KEGIATAN = ['kegiatan pagi', 'kegiatan sore'];
@@ -226,6 +226,35 @@ export default function TabelJadwalPage() {
     teacherCodeMap[g.id] = getTeacherCode(idx + 1);
   });
 
+  const renderCellContent = (text: string) => {
+    if (!text) return '-';
+    const words = text.split(/\s+/).filter(Boolean);
+    if (words.length <= 1) {
+      return (
+        <span className="block truncate w-full text-center" title={text}>
+          {text}
+        </span>
+      );
+    }
+    
+    const hasMore = words.length > 3;
+    const displayWords = words.slice(0, 3);
+    
+    return (
+      <div className="flex flex-col items-center justify-center w-full leading-tight">
+        {displayWords.map((w, idx) => {
+          const isLast = idx === displayWords.length - 1;
+          const displayText = (isLast && hasMore) ? `${w}...` : w;
+          return (
+            <span key={idx} className="block truncate w-full text-center" title={text}>
+              {displayText}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
+
   // Natural sort helper: sorts strings with embedded numbers properly (A1, A2, A10 not A1, A10, A2)
   const naturalSort = (a: ClassOption, b: ClassOption) => {
     return a.nama.localeCompare(b.nama, undefined, { numeric: true, sensitivity: 'base' });
@@ -270,12 +299,15 @@ export default function TabelJadwalPage() {
     } else if (activeTab === 'quran') {
       return classesQuran.filter(c => {
         const n = c.nama.toUpperCase();
-        const matchesAsrama = activeAsrama === 'Tahfidz Putri' 
-          ? n.includes('TAHFIDZ PUTRI') 
-          : (n.includes(activeAsrama.toUpperCase()) && !n.includes('TAHFIDZ PUTRI'));
-        if (!matchesAsrama) return false;
-
-        return getQuranCategory(c.nama) === quranLevelTab;
+        if (activeAsrama === 'Tahfidz Putra') {
+          return n.includes('TAHFIDZ') && n.includes('ASRAMA A');
+        } else if (activeAsrama === 'Tahfidz Putri') {
+          return n.includes('TAHFIDZ PUTRI');
+        } else if (activeAsrama === 'Asrama A') {
+          return n.includes('ASRAMA A') && !n.includes('TAHFIDZ');
+        } else {
+          return n.includes(activeAsrama.toUpperCase()) && !n.includes('TAHFIDZ PUTRI');
+        }
       }).sort(naturalSort);
     } else {
       // Kegiatan Asrama - natural sort so A1, A2, A10 sort correctly
@@ -284,6 +316,121 @@ export default function TabelJadwalPage() {
   };
 
   const activeRows = getActiveRows();
+
+  // Dynamically filter secondary and tertiary options for non-admin/staff
+  const availableMadinGenders = ['PUTRA', 'PUTRI'].filter(gender => {
+    if (role === 'admin' || role === 'staff') return true;
+    return jadwalList.some(s => {
+      if (s.tipe !== 'madin') return false;
+      const isPutri = s.tempat?.toUpperCase().includes('PUTRI') || s.tempat?.toUpperCase().includes('TQ PUTRI');
+      return gender === 'PUTRI' ? isPutri : !isPutri;
+    });
+  });
+
+  const availableMadinLevels = (genderMode === 'PUTRA' ? ['WUSTHO_MAK', 'ULA'] : ['WUSTHO', 'ULA']).filter(lvl => {
+    if (role === 'admin' || role === 'staff') return true;
+    return jadwalList.some(s => {
+      if (s.tipe !== 'madin') return false;
+      const isPutri = s.tempat?.toUpperCase().includes('PUTRI') || s.tempat?.toUpperCase().includes('TQ PUTRI');
+      const matchesGender = genderMode === 'PUTRI' ? isPutri : !isPutri;
+      if (!matchesGender) return false;
+      
+      const n = s.tempat?.toUpperCase() || '';
+      if (genderMode === 'PUTRA') {
+        if (lvl === 'WUSTHO_MAK') {
+          return n.includes('WUSTHO') || n.includes('MAK') || n === 'TQ PUTRA';
+        } else {
+          return n.includes('ULA');
+        }
+      } else {
+        if (lvl === 'WUSTHO') {
+          return n.includes('WUSTHO') || n.includes('MAK');
+        } else {
+          return n.includes('ULA') || n.includes('TQ PUTRI');
+        }
+      }
+    });
+  });
+
+  const availableQuranAsramas = ASRAMAS_QURAN.filter(asr => {
+    if (role === 'admin' || role === 'staff') return true;
+    return jadwalList.some(s => {
+      if (s.tipe !== 'quran') return false;
+      const n = s.tempat?.toUpperCase() || '';
+      
+      if (asr === 'Tahfidz Putra') {
+        return n.includes('TAHFIDZ') && n.includes('ASRAMA A');
+      } else if (asr === 'Tahfidz Putri') {
+        return n.includes('TAHFIDZ PUTRI');
+      } else if (asr === 'Asrama A') {
+        return n.includes('ASRAMA A') && !n.includes('TAHFIDZ');
+      } else {
+        return n.includes(asr.toUpperCase()) && !n.includes('TAHFIDZ PUTRI');
+      }
+    });
+  });
+
+  const availableQuranLevels = LEVELS_QURAN.filter(lvl => {
+    if (role === 'admin' || role === 'staff') return true;
+    return jadwalList.some(s => {
+      if (s.tipe !== 'quran') return false;
+      const n = s.tempat?.toUpperCase() || '';
+      const matchesAsrama = activeAsrama === 'Tahfidz Putri' 
+        ? n.includes('TAHFIDZ PUTRI') 
+        : (n.includes(activeAsrama.toUpperCase()) && !n.includes('TAHFIDZ PUTRI'));
+      if (!matchesAsrama) return false;
+      return getQuranCategory(s.tempat || '') === lvl;
+    });
+  });
+
+  const availableKegiatanAsramas = ASRAMAS_KEGIATAN.filter(asr => {
+    if (role === 'admin' || role === 'staff') return true;
+    return jadwalList.some(s => {
+      if (s.tipe !== 'kegiatan') return false;
+      const room = rooms.find(r => r.id === s.tempat_id);
+      return room?.nama_asrama === asr;
+    });
+  });
+
+  const availableKegiatanLevels = LEVELS_KEGIATAN.filter(lvl => {
+    if (role === 'admin' || role === 'staff') return true;
+    return jadwalList.some(s => {
+      if (s.tipe !== 'kegiatan') return false;
+      const room = rooms.find(r => r.id === s.tempat_id);
+      if (room?.nama_asrama !== activeAsrama) return false;
+      const isSore = s.jam_mulai >= '12:00:00';
+      return lvl === 'kegiatan sore' ? isSore : !isSore;
+    });
+  });
+
+  // Auto-sync sub-tab selection for non-admin/staff
+  useEffect(() => {
+    if (loading || role === 'admin' || role === 'staff') return;
+
+    if (activeTab === 'madin') {
+      if (availableMadinGenders.length > 0 && !availableMadinGenders.includes(genderMode)) {
+        setGenderMode(availableMadinGenders[0] as 'PUTRA' | 'PUTRI');
+      }
+      if (availableMadinLevels.length > 0 && !availableMadinLevels.includes(levelTab as any)) {
+        setLevelTab(availableMadinLevels[0] as any);
+      }
+    } else if (activeTab === 'quran') {
+      if (availableQuranAsramas.length > 0 && !availableQuranAsramas.includes(activeAsrama)) {
+        setActiveAsrama(availableQuranAsramas[0]);
+      }
+      if (availableQuranLevels.length > 0 && !availableQuranLevels.includes(quranLevelTab)) {
+        setQuranLevelTab(availableQuranLevels[0]);
+      }
+    } else if (activeTab === 'kegiatan') {
+      if (availableKegiatanAsramas.length > 0 && !availableKegiatanAsramas.includes(activeAsrama)) {
+        setActiveAsrama(availableKegiatanAsramas[0]);
+      }
+      if (availableKegiatanLevels.length > 0 && !availableKegiatanLevels.includes(kegiatanLevelTab)) {
+        setKegiatanLevelTab(availableKegiatanLevels[0]);
+      }
+    }
+  }, [loading, role, activeTab, genderMode, activeAsrama, levelTab, quranLevelTab, kegiatanLevelTab, jadwalList, rooms]);
+
 
   // Helper to simplify row header display labels
   const getShortLabel = (nama: string) => {
@@ -451,13 +598,15 @@ export default function TabelJadwalPage() {
       subtitle = `Tingkat: ${levelTab === 'WUSTHO_MAK' ? 'WUSTHO & MAK' : 'ULA'}`;
     } else if (activeTab === 'quran') {
       title += ` - ${activeAsrama.toUpperCase()}`;
-      subtitle = `Kelompok: ${quranLevelTab.toUpperCase()}`;
+      subtitle = `Pondok Pesantren Matholi'ul Anwar`;
     } else {
       title += ` - ${activeAsrama.toUpperCase()}`;
       subtitle = `Waktu: ${kegiatanLevelTab.toUpperCase()}`;
     }
 
-    subtitle += ` | Pondok Pesantren Matholi'ul Anwar`;
+    if (activeTab !== 'quran') {
+      subtitle += ` | Pondok Pesantren Matholi'ul Anwar`;
+    }
     const filename = `Tabel_Jadwal_${activeTab}_${orientation}`;
 
     // Cells mapped by `${hariKey}_${kelasKey}`
@@ -492,14 +641,15 @@ export default function TabelJadwalPage() {
       label: getDisplayMalam(h).replace(' (', '\n(')
     }));
 
-    // Find teachers involved in the current view
+    // Find teachers involved in the current active view (activeRows), excluding Monday (Senin) for Madin (Ngaji Umum)
     const involvedGuruIds = new Set<number>();
     activeRows.forEach(row => {
       DAYS.forEach(h => {
-        const sch = getCellSchedule(h, row.id);
-        if (sch && sch.guru_id) {
-          involvedGuruIds.add(sch.guru_id);
-        }
+        if (activeTab === 'madin' && h === 'Senin') return;
+        const cellSchedules = schedulesMap[`${h}_${row.id}`] || [];
+        cellSchedules.forEach(sch => {
+          if (sch.guru_id) involvedGuruIds.add(sch.guru_id);
+        });
       });
     });
 
@@ -624,25 +774,29 @@ export default function TabelJadwalPage() {
           {/* Madin secondary option (Gender) */}
           {activeTab === 'madin' && (
             <div className="flex w-full bg-gray-100 dark:bg-gray-900 p-1 rounded-xl border border-gray-200/50 dark:border-gray-700">
-              <button
-                onClick={() => setGenderMode('PUTRA')}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center ${genderMode === 'PUTRA' ? 'bg-white dark:bg-gray-800 text-green-700 dark:text-green-400 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                PUTRA
-              </button>
-              <button
-                onClick={() => setGenderMode('PUTRI')}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center ${genderMode === 'PUTRI' ? 'bg-white dark:bg-gray-800 text-green-700 dark:text-green-400 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                PUTRI
-              </button>
+              {availableMadinGenders.includes('PUTRA') && (
+                <button
+                  onClick={() => setGenderMode('PUTRA')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center ${genderMode === 'PUTRA' ? 'bg-white dark:bg-gray-800 text-green-700 dark:text-green-400 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  PUTRA
+                </button>
+              )}
+              {availableMadinGenders.includes('PUTRI') && (
+                <button
+                  onClick={() => setGenderMode('PUTRI')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center ${genderMode === 'PUTRI' ? 'bg-white dark:bg-gray-800 text-green-700 dark:text-green-400 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  PUTRI
+                </button>
+              )}
             </div>
           )}
 
           {/* Qur'an Asrama selection */}
           {activeTab === 'quran' && (
             <div className="flex w-full bg-gray-100 dark:bg-gray-900 p-1 rounded-xl border border-gray-200/50 dark:border-gray-700 flex-wrap gap-1">
-              {ASRAMAS_QURAN.map((asr) => (
+              {ASRAMAS_QURAN.filter(asr => availableQuranAsramas.includes(asr)).map((asr) => (
                 <button
                   key={asr}
                   onClick={() => setActiveAsrama(asr)}
@@ -661,7 +815,7 @@ export default function TabelJadwalPage() {
           {/* Kegiatan Asrama selection */}
           {activeTab === 'kegiatan' && (
             <div className="flex w-full bg-gray-100 dark:bg-gray-900 p-1 rounded-xl border border-gray-200/50 dark:border-gray-700">
-              {ASRAMAS_KEGIATAN.map((asr) => (
+              {ASRAMAS_KEGIATAN.filter(asr => availableKegiatanAsramas.includes(asr)).map((asr) => (
                 <button
                   key={asr}
                   onClick={() => setActiveAsrama(asr)}
@@ -680,65 +834,57 @@ export default function TabelJadwalPage() {
         </div>
 
         {/* Dynamic Tertiary Option Selector (Level Sub-tabs) */}
-        <div className="w-full">
-          
-          {/* Sub-tabs Level - full width evenly distributed */}
-          <div className="flex w-full bg-gray-100 dark:bg-gray-900/50 p-1 rounded-xl border border-gray-200/50 dark:border-gray-700">
-            {activeTab === 'madin' && (
-              <>
+        {activeTab !== 'quran' && (
+          <div className="w-full">
+            
+            {/* Sub-tabs Level - full width evenly distributed */}
+            <div className="flex w-full bg-gray-100 dark:bg-gray-900/50 p-1 rounded-xl border border-gray-200/50 dark:border-gray-700">
+              {activeTab === 'madin' && (
+                <>
+                  {availableMadinLevels.includes(genderMode === 'PUTRA' ? 'WUSTHO_MAK' : 'WUSTHO') && (
+                    <button
+                      onClick={() => setLevelTab(genderMode === 'PUTRA' ? 'WUSTHO_MAK' : 'WUSTHO')}
+                      className={`flex-1 py-2 text-[11px] font-bold rounded-lg transition-all text-center ${
+                        levelTab !== 'ULA' 
+                          ? 'bg-white dark:bg-gray-800 text-green-700 dark:text-green-400 shadow-sm' 
+                          : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                      }`}
+                    >
+                      {genderMode === 'PUTRA' ? 'WUSTHO & MAK' : 'WUSTHO'}
+                    </button>
+                  )}
+                  {availableMadinLevels.includes('ULA') && (
+                    <button
+                      onClick={() => setLevelTab('ULA')}
+                      className={`flex-1 py-2 text-[11px] font-bold rounded-lg transition-all text-center ${
+                        levelTab === 'ULA' 
+                          ? 'bg-white dark:bg-gray-800 text-green-700 dark:text-green-400 shadow-sm' 
+                          : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                      }`}
+                    >
+                      ULA
+                    </button>
+                  )}
+                </>
+              )}
+
+              {activeTab === 'kegiatan' && LEVELS_KEGIATAN.filter(lvl => availableKegiatanLevels.includes(lvl)).map(lvl => (
                 <button
-                  onClick={() => setLevelTab(genderMode === 'PUTRA' ? 'WUSTHO_MAK' : 'WUSTHO')}
-                  className={`flex-1 py-2 text-[11px] font-bold rounded-lg transition-all text-center ${
-                    levelTab !== 'ULA' 
-                      ? 'bg-white dark:bg-gray-800 text-green-700 dark:text-green-400 shadow-sm' 
+                  key={lvl}
+                  onClick={() => setKegiatanLevelTab(lvl)}
+                  className={`flex-1 py-2 text-[11px] font-bold rounded-lg transition-all capitalize text-center ${
+                    kegiatanLevelTab === lvl 
+                      ? 'bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-400 shadow-sm' 
                       : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                   }`}
                 >
-                  {genderMode === 'PUTRA' ? 'WUSTHO & MAK' : 'WUSTHO'}
+                  {lvl}
                 </button>
-                <button
-                  onClick={() => setLevelTab('ULA')}
-                  className={`flex-1 py-2 text-[11px] font-bold rounded-lg transition-all text-center ${
-                    levelTab === 'ULA' 
-                      ? 'bg-white dark:bg-gray-800 text-green-700 dark:text-green-400 shadow-sm' 
-                      : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                  }`}
-                >
-                  ULA
-                </button>
-              </>
-            )}
+              ))}
+            </div>
 
-            {activeTab === 'quran' && LEVELS_QURAN.map(lvl => (
-              <button
-                key={lvl}
-                onClick={() => setQuranLevelTab(lvl)}
-                className={`flex-1 py-2 text-[11px] font-bold rounded-lg transition-all capitalize text-center ${
-                  quranLevelTab === lvl 
-                    ? 'bg-white dark:bg-gray-800 text-emerald-700 dark:text-emerald-400 shadow-sm' 
-                    : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
-              >
-                {lvl}
-              </button>
-            ))}
-
-            {activeTab === 'kegiatan' && LEVELS_KEGIATAN.map(lvl => (
-              <button
-                key={lvl}
-                onClick={() => setKegiatanLevelTab(lvl)}
-                className={`flex-1 py-2 text-[11px] font-bold rounded-lg transition-all capitalize text-center ${
-                  kegiatanLevelTab === lvl 
-                    ? 'bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-400 shadow-sm' 
-                    : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
-              >
-                {lvl}
-              </button>
-            ))}
           </div>
-
-        </div>
+        )}
 
       </div>
 
@@ -822,7 +968,11 @@ export default function TabelJadwalPage() {
                       className="hover:bg-gray-50/30 dark:hover:bg-gray-800/10 transition-colors"
                     >
                       {/* Class Header cell */}
-                      <td className="px-2 py-3 border-r border-gray-200 dark:border-gray-700 font-extrabold bg-green-50/60 dark:bg-green-900/20 text-green-800 dark:text-green-300 text-center text-xs leading-snug" style={{minHeight: '60px'}}>
+                      <td 
+                        className="px-2 py-3 border-r border-gray-200 dark:border-gray-700 font-extrabold bg-green-50/60 dark:bg-green-900/20 text-green-800 dark:text-green-300 text-center text-xs leading-snug truncate max-w-[100px]" 
+                        style={{minHeight: '60px'}}
+                        title={rowItem.nama}
+                      >
                         {getShortLabel(rowItem.nama)}
                       </td>
 
@@ -875,12 +1025,12 @@ export default function TabelJadwalPage() {
                           >
                             {schedule ? (
                               <div className="flex flex-col items-center justify-center gap-0.5 py-1 min-h-[52px]">
-                                <span className="font-extrabold text-gray-900 dark:text-white text-xs text-center leading-snug line-clamp-2">
-                                  {schedule.kegiatan}
-                                </span>
+                                <div className="font-extrabold text-gray-900 dark:text-white text-xs text-center leading-snug w-full">
+                                  {renderCellContent(schedule.kegiatan)}
+                                </div>
                                 <div className="flex items-center gap-1 flex-wrap justify-center">
                                   {schedule.guru_id ? (
-                                    <span className="inline-flex items-center justify-center font-bold px-1.5 py-0.5 text-[9px] rounded-md bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-400 border border-green-200 dark:border-green-900/30 whitespace-nowrap">
+                                    <span className="flex items-center justify-center font-bold px-2 h-6 min-w-[24px] text-[9px] rounded-lg bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-400 border border-green-200 dark:border-green-900/30 whitespace-nowrap">
                                       {teacherCode}
                                     </span>
                                   ) : null}
@@ -918,11 +1068,11 @@ export default function TabelJadwalPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 text-xs">
             {sortedGurus
               .filter(g => {
-                // Only show teachers involved in the current active view
                 return activeRows.some(row =>
                   DAYS.some(h => {
-                    const sch = getCellSchedule(h, row.id);
-                    return sch && sch.guru_id === g.id;
+                    if (activeTab === 'madin' && h === 'Senin') return false;
+                    const cellSchedules = schedulesMap[`${h}_${row.id}`] || [];
+                    return cellSchedules.some(sch => sch.guru_id === g.id);
                   })
                 );
               })

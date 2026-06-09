@@ -9,6 +9,8 @@ export default function KelasPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [role, setRole] = useState('guru');
+  // Tab visibility: array of tabs this user has access to
+  const [availableTabs, setAvailableTabs] = useState<Array<'quran' | 'madin'>>(['quran', 'madin']);
 
   useEffect(() => {
     const fetchMe = async () => {
@@ -18,7 +20,28 @@ export default function KelasPage() {
         if (json.success) setRole(json.user.role);
       } catch (err) {}
     };
+    // Fetch jadwal to determine which tabs to show for guru role
+    const fetchJadwal = async () => {
+      try {
+        const res = await fetch('/api/jadwal');
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          const jadwalList: any[] = json.data;
+          // Admin/staff can see all tabs — filtering happens after role is known
+          const tabs: Array<'quran' | 'madin'> = [];
+          if (jadwalList.some((j: any) => j.tipe === 'quran')) tabs.push('quran');
+          if (jadwalList.some((j: any) => j.tipe === 'madin')) tabs.push('madin');
+          // If no jadwal found (e.g. admin), keep both tabs
+          if (tabs.length > 0) {
+            setAvailableTabs(tabs);
+            // Set default tab to first available
+            setActiveTab(tabs[0]);
+          }
+        }
+      } catch (err) {}
+    };
     fetchMe();
+    fetchJadwal();
   }, []);
 
   useEffect(() => {
@@ -130,6 +153,10 @@ export default function KelasPage() {
   const searchTambahRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canEdit = role === 'admin' || role === 'staff';
+  // For admin/staff, always show both tabs
+  const visibleTabs: Array<'quran' | 'madin'> = (role === 'admin' || role === 'staff')
+    ? ['quran', 'madin']
+    : availableTabs;
 
   const handleEditClick = (item: any) => {
     setEditingKelas({ ...item, type: activeTab });
@@ -298,20 +325,24 @@ export default function KelasPage() {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — filtered by jadwal for guru role */}
       <div className="flex gap-4 border-b border-gray-200 dark:border-gray-700">
-        <button 
-          onClick={() => setActiveTab('quran')}
-          className={`pb-3 px-2 font-bold text-sm transition-colors ${activeTab === 'quran' ? 'border-b-2 border-teal-600 text-teal-700 dark:text-teal-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-        >
-          Kelas Qur&apos;an
-        </button>
-        <button 
-          onClick={() => setActiveTab('madin')}
-          className={`pb-3 px-2 font-bold text-sm transition-colors ${activeTab === 'madin' ? 'border-b-2 border-teal-600 text-teal-700 dark:text-teal-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-        >
-          Kelas Madin
-        </button>
+        {visibleTabs.includes('quran') && (
+          <button 
+            onClick={() => setActiveTab('quran')}
+            className={`pb-3 px-2 font-bold text-sm transition-colors ${activeTab === 'quran' ? 'border-b-2 border-teal-600 text-teal-700 dark:text-teal-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+          >
+            Kelas Qur&apos;an
+          </button>
+        )}
+        {visibleTabs.includes('madin') && (
+          <button 
+            onClick={() => setActiveTab('madin')}
+            className={`pb-3 px-2 font-bold text-sm transition-colors ${activeTab === 'madin' ? 'border-b-2 border-teal-600 text-teal-700 dark:text-teal-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+          >
+            Kelas Madin
+          </button>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 items-center">
