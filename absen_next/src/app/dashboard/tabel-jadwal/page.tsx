@@ -228,30 +228,10 @@ export default function TabelJadwalPage() {
 
   const renderCellContent = (text: string) => {
     if (!text) return '-';
-    const words = text.split(/\s+/).filter(Boolean);
-    if (words.length <= 1) {
-      return (
-        <span className="block truncate w-full text-center" title={text}>
-          {text}
-        </span>
-      );
-    }
-    
-    const hasMore = words.length > 3;
-    const displayWords = words.slice(0, 3);
-    
     return (
-      <div className="flex flex-col items-center justify-center w-full leading-tight">
-        {displayWords.map((w, idx) => {
-          const isLast = idx === displayWords.length - 1;
-          const displayText = (isLast && hasMore) ? `${w}...` : w;
-          return (
-            <span key={idx} className="block truncate w-full text-center" title={text}>
-              {displayText}
-            </span>
-          );
-        })}
-      </div>
+      <span className="block w-full text-center line-clamp-3 break-words whitespace-normal" title={text}>
+        {text}
+      </span>
     );
   };
 
@@ -969,8 +949,8 @@ export default function TabelJadwalPage() {
                     >
                       {/* Class Header cell */}
                       <td 
-                        className="px-2 py-3 border-r border-gray-200 dark:border-gray-700 font-extrabold bg-green-50/60 dark:bg-green-900/20 text-green-800 dark:text-green-300 text-center text-xs leading-snug truncate max-w-[100px]" 
-                        style={{minHeight: '60px'}}
+                        className="px-2 py-3 border-r border-gray-200 dark:border-gray-700 font-extrabold bg-green-50/60 dark:bg-green-900/20 text-green-800 dark:text-green-300 text-center text-xs leading-snug break-words" 
+                        style={{minHeight: '60px', wordBreak: 'break-word'}}
                         title={rowItem.nama}
                       >
                         {getShortLabel(rowItem.nama)}
@@ -1030,7 +1010,7 @@ export default function TabelJadwalPage() {
                                 </div>
                                 <div className="flex items-center gap-1 flex-wrap justify-center">
                                   {schedule.guru_id ? (
-                                    <span className="flex items-center justify-center font-bold px-2 h-6 min-w-[24px] text-[9px] rounded-lg bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-400 border border-green-200 dark:border-green-900/30 whitespace-nowrap">
+                                    <span className="flex items-center justify-center font-bold w-8 h-6 shrink-0 text-[9px] rounded-lg bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-400 border border-green-200 dark:border-green-900/30 whitespace-nowrap">
                                       {teacherCode}
                                     </span>
                                   ) : null}
