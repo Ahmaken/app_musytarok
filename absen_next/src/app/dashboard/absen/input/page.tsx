@@ -221,42 +221,56 @@ function InputAbsenContent() {
 
   const handleShareToWA = async () => {
     const text = generateWaGroupMessage();
-    
-    // Attempt native share if supported (for mobile devices to attach the photo natively)
-    if (navigator.canShare) {
+
+    // Jika ada foto (dataUrl dari kamera atau blob URL dari upload), coba native share dulu
+    if (photoUrl && navigator.canShare) {
       try {
         let filesArray: File[] = [];
-        if (photoUrl) {
-          // Fetch the image to convert it into a File object
-          const response = await fetch(photoUrl);
-          const blob = await response.blob();
-          // Extract filename from URL or use a default
-          const filename = photoUrl.split('/').pop() || 'foto_kehadiran.jpg';
-          const file = new File([blob], filename, { type: blob.type });
-          filesArray.push(file);
-        }
-        
+
+        // Konversi dataUrl atau blob URL menjadi File object
+        const response = await fetch(photoUrl);
+        const blob = await response.blob();
+        const mimeType = blob.type || 'image/jpeg';
+        const ext = mimeType.split('/')[1] || 'jpg';
+        const file = new File([blob], `foto_kehadiran_${Date.now()}.${ext}`, { type: mimeType });
+        filesArray.push(file);
+
         const shareData: any = {
           title: `Laporan Kehadiran ${namaTarget}`,
           text: text,
+          files: filesArray,
         };
-        
-        if (filesArray.length > 0) {
-          shareData.files = filesArray;
-        }
 
-        // Test if the system can share this payload
         if (navigator.canShare(shareData)) {
           await navigator.share(shareData);
-          return; // Success, we don't need to do anything else
+          return;
         }
-      } catch (err) {
-        console.log('Native share failed or cancelled:', err);
-        // Fallback to URL if it fails
+      } catch (err: any) {
+        // Jika error bukan karena dibatalkan user, coba fallback tanpa foto
+        if (err?.name !== 'AbortError') {
+          console.warn('Share dengan foto gagal, fallback tanpa foto:', err);
+        } else {
+          // User membatalkan — tidak perlu fallback
+          return;
+        }
       }
     }
-    
-    // Fallback: regular WhatsApp Web/App URL
+
+    // Jika tidak ada foto atau native share tidak didukung, coba share teks saja
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Laporan Kehadiran ${namaTarget}`,
+          text: text,
+        });
+        return;
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return;
+        console.warn('Share teks gagal, fallback ke URL:', err);
+      }
+    }
+
+    // Fallback terakhir: buka WhatsApp Web / App
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
   };
 

@@ -259,23 +259,28 @@ function NotifikasiContent() {
     return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
   };
 
-  // Jika diakses setelah absen, bisa filter otomatis by kelas, tapi untuk sekarang kita filter dari list murid
-  const filteredByKelas = selectedKategoriId 
-    ? muridList.filter(m => (m.kelas_quran_id?.toString() === selectedKategoriId) || (m.kelas_madin_id?.toString() === selectedKategoriId) || (m.kamar_id?.toString() === selectedKategoriId) || true) // Simplified for demo, backend should ideally filter, but since all murid is loaded, we fallback to all
+  // Filter murid berdasarkan kelas/kamar yang dipilih
+  const filteredByKelas = selectedKategoriId
+    ? muridList.filter(m => {
+        if (tipePesan === 'quran') return m.kelas_quran_id?.toString() === selectedKategoriId;
+        if (tipePesan === 'madin') return m.kelas_madin_id?.toString() === selectedKategoriId;
+        if (tipePesan === 'kamar') return m.kamar_id?.toString() === selectedKategoriId;
+        return false;
+      })
     : muridList;
 
   // Hanya tampilkan hasil jika ada pencarian (min 1 karakter) ATAU jika redirect dari absen (punya parameter)
   const isAutoFilter = initKegiatan && initKelas;
   const hasSearch = search.trim().length > 0 || isAutoFilter;
   const filteredMurid = hasSearch
-    ? muridList.filter(m => {
-        // Jika ada pencarian, cocokkan nama
+    ? filteredByKelas.filter(m => {
+        // Jika ada pencarian teks, cocokkan nama
         if (search.trim().length > 0) {
             return m.nama?.toLowerCase().includes(search.toLowerCase()) ||
                    m.nama_wali?.toLowerCase().includes(search.toLowerCase());
         }
-        // Jika dari auto filter, tampilkan semua (backend /api/whatsapp-list bisa ditingkatkan untuk filter ini nanti)
-        return true; 
+        // Jika dari auto-filter redirect absen, tampilkan santri di kelas yang baru diabsen
+        return true;
     })
     : [];
 
