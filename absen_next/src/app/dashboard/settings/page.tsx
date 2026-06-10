@@ -555,11 +555,11 @@ export default function SettingsPage() {
               </h3>
               <div className="mt-3 space-y-1.5 text-sm">
                 {[
-                  { tab: 'Data_Santri', mode: 'Overwrite', color: 'blue' },
-                  { tab: 'Data_Guru', mode: 'Overwrite', color: 'blue' },
-                  { tab: 'Jadwal', mode: 'Overwrite', color: 'blue' },
-                  { tab: 'Rekap_Absensi', mode: 'Append', color: 'amber' },
-                  { tab: 'Ketertiban', mode: 'Append', color: 'amber' },
+                  { tab: 'Data_Santri', mode: 'Overwrite (Timpa Baru)', color: 'blue' },
+                  { tab: 'Data_Guru', mode: 'Overwrite (Timpa Baru)', color: 'blue' },
+                  { tab: 'Jadwal', mode: 'Overwrite (Timpa Baru)', color: 'blue' },
+                  { tab: 'Rekap_Absensi', mode: 'Append (Tambah ke Bawah)', color: 'amber' },
+                  { tab: 'Ketertiban', mode: 'Append (Tambah ke Bawah)', color: 'amber' },
                 ].map(item => (
                   <div key={item.tab} className="flex items-center justify-between">
                     <span className="font-mono text-xs text-gray-600 dark:text-gray-400">{item.tab}</span>
@@ -723,7 +723,7 @@ export default function SettingsPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {asramaData.users_asrama.map((u: any) => (
+                          {[...(asramaData.users_asrama || [])].sort((a: any, b: any) => (a.nama_kamar || '').localeCompare((b.nama_kamar || ''), 'id', { numeric: true })).map((u: any) => (
                             <tr key={u.id} className="border-t border-gray-100 dark:border-gray-700">
                               <td className="px-3 py-2 font-mono">{u.username}</td>
                               <td className="px-3 py-2">{u.kamar_id ?? <span className="text-red-500 font-bold">NULL</span>}</td>
@@ -771,7 +771,7 @@ export default function SettingsPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {asramaData.kamar?.map((k: any) => (
+                        {[...(asramaData.kamar || [])].sort((a: any, b: any) => (a.nama_kamar || '').localeCompare((b.nama_kamar || ''), 'id', { numeric: true })).map((k: any) => (
                           <tr key={k.kamar_id} className="border-t border-gray-100 dark:border-gray-700">
                             <td className="px-3 py-1">{k.kamar_id}</td>
                             <td className="px-3 py-1 font-mono">{k.nama_kamar}</td>

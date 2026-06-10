@@ -275,7 +275,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               <Menu size={20} />
               {(activeSchedule || ((user?.role === 'admin' || user?.role === 'staff') && pendingRemindersCount > 0)) && (
-                <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border border-green-800 dark:border-gray-800 sm:hidden"></span>
+                <>
+                  <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border border-green-800 dark:border-gray-800 sm:hidden z-10"></span>
+                  <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping opacity-75 sm:hidden"></span>
+                </>
               )}
             </button>
           </div>
