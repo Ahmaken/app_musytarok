@@ -145,7 +145,8 @@ export async function GET(request: Request) {
       console.error('Error fetching target name:', e);
     }
 
-    return NextResponse.json({ success: true, data: mappedMurid, namaTarget });
+    const sudah_absen = existing.length > 0;
+    return NextResponse.json({ success: true, data: mappedMurid, namaTarget, sudah_absen });
   } catch (err: any) {
     return NextResponse.json({ error: 'Server error: ' + err.message }, { status: 500 });
   }

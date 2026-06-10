@@ -24,6 +24,7 @@ function InputAbsenContent() {
   const [namaTarget, setNamaTarget] = useState('Kelas/Kamar');
   const [photoUrl, setPhotoUrl] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [sudahAbsen, setSudahAbsen] = useState(false);
 
   // Camera state
   const [showCamera, setShowCamera] = useState(false);
@@ -47,6 +48,7 @@ function InputAbsenContent() {
         if (json.success) {
           setMurid(json.data);
           if (json.namaTarget) setNamaTarget(json.namaTarget);
+          if (json.sudah_absen !== undefined) setSudahAbsen(json.sudah_absen);
         } else {
           setErrorMsg(json.error || 'Gagal memuat data santri');
         }
@@ -296,6 +298,7 @@ function InputAbsenContent() {
       });
       const data = await res.json();
       if (data.success) {
+        setSudahAbsen(true);
         setIsSuccess(true);
       } else {
         alert('Gagal: ' + data.error);
@@ -316,8 +319,133 @@ function InputAbsenContent() {
           <CheckCircle size={48} className="text-green-600 dark:text-green-400" />
         </div>
         <h2 className="text-2xl font-extrabold text-gray-800 dark:text-gray-200 mb-2">Absensi Berhasil Disimpan!</h2>
-        <p className="text-gray-600 dark:text-gray-400 mb-8">Data kehadiran santri telah berhasil masuk ke sistem.</p>
+        <p className="text-gray-600 dark:text-gray-400 mb-6">Data kehadiran santri telah berhasil masuk ke sistem.</p>
         
+        {/* Section: Ambil/Upload Foto */}
+        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl p-4 border border-gray-150 dark:border-gray-750 mb-6 space-y-3 text-left">
+          <label className="block text-sm font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2">
+            <Camera size={18} className="text-indigo-600 dark:text-indigo-400 animate-pulse" />
+            Foto Kehadiran Kelas/Kamar (Opsional)
+          </label>
+
+          {/* Camera live view */}
+          {showCamera && (
+            <div className="rounded-2xl overflow-hidden border-2 border-indigo-400 dark:border-indigo-600 bg-black relative mb-3">
+              {/* Camera toolbar */}
+              <div className="flex justify-between items-center bg-gray-900 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${facingMode === 'environment' ? 'bg-green-400' : 'bg-blue-400'}`} />
+                  <span className="text-xs font-semibold text-gray-300">
+                    {facingMode === 'environment' ? '📷 Kamera Belakang' : '🤳 Kamera Depan'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={switchCamera}
+                    disabled={isSwitchingCamera}
+                    title={facingMode === 'environment' ? 'Ganti ke Kamera Depan' : 'Ganti ke Kamera Belakang'}
+                    className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl transition-all ${
+                      isSwitchingCamera ? 'bg-gray-600 text-gray-400 cursor-wait' : 'bg-blue-600 hover:bg-blue-500 active:scale-95 text-white'
+                    }`}
+                  >
+                    <FlipHorizontal size={14} className={isSwitchingCamera ? 'animate-spin' : ''} />
+                    <span className="hidden sm:inline">
+                      {isSwitchingCamera ? 'Mengganti...' : facingMode === 'environment' ? 'Kamera Depan' : 'Kamera Belakang'}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeCamera}
+                    className="bg-red-500 hover:bg-red-600 p-1.5 rounded-lg transition-colors"
+                    aria-label="Tutup Kamera"
+                  >
+                    <XIcon size={16} className="text-white" />
+                  </button>
+                </div>
+              </div>
+              {/* Video preview */}
+              <div className="relative min-h-[240px] bg-black">
+                {isSwitchingCamera && (
+                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/80 gap-2">
+                    <div className="w-8 h-8 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-white text-xs font-semibold">Mengganti kamera...</span>
+                  </div>
+                )}
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full object-cover max-h-[360px]"
+                />
+              </div>
+              {/* Capture button */}
+              <div className="flex justify-center bg-gray-900 py-3 px-4">
+                <button
+                  type="button"
+                  onClick={capturePhoto}
+                  className="bg-white hover:bg-gray-100 active:scale-95 text-gray-900 font-bold px-8 py-2.5 rounded-full shadow-lg transition-all flex items-center gap-2 text-sm"
+                >
+                  <Camera size={16} /> Ambil Foto
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Canvas (hidden) for snapshot */}
+          <canvas ref={canvasRef} className="hidden" />
+
+          {/* Buttons side-by-side full width */}
+          <div className="grid grid-cols-2 gap-3 w-full">
+            {!showCamera ? (
+              <button
+                type="button"
+                onClick={openCamera}
+                className="w-full cursor-pointer bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-bold py-3.5 rounded-xl border border-indigo-200 dark:border-indigo-850 text-xs transition-all flex items-center justify-center gap-2"
+              >
+                <Camera size={16} />
+                {photoUrl ? 'Ambil Ulang' : 'Buka Kamera'}
+              </button>
+            ) : (
+              <div className="w-full" />
+            )}
+
+            <div className="w-full">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                className="hidden"
+                id="presence-photo-input"
+              />
+              <label
+                htmlFor="presence-photo-input"
+                className="w-full cursor-pointer bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-750 text-gray-750 dark:text-gray-250 font-bold py-3.5 rounded-xl border border-gray-200 dark:border-gray-650 text-xs transition-all flex items-center justify-center gap-2 text-center block"
+              >
+                <Image size={16} /> Upload File
+              </label>
+            </div>
+          </div>
+
+          {photoUrl && (
+            <div className="mt-3 relative w-full h-48 rounded-xl overflow-hidden border-2 border-indigo-200 dark:border-indigo-700 shadow-sm animate-in fade-in duration-300">
+              <img src={photoUrl} alt="Preview" className="w-full h-full object-cover" />
+              <button
+                type="button"
+                onClick={() => setPhotoUrl('')}
+                className="absolute top-2 right-2 bg-red-650 hover:bg-red-750 text-white rounded-full p-1.5 shadow-md transition-colors w-7 h-7 flex items-center justify-center"
+              >
+                <XIcon size={14} />
+              </button>
+            </div>
+          )}
+
+          <p className="text-[10px] text-gray-400 font-medium text-center">
+            Gunakan tombol <strong>Buka Kamera</strong> untuk foto langsung, atau <strong>Upload File</strong> jika ingin memilih dari galeri.
+          </p>
+        </div>
+
         <div className="space-y-3">
           <button
             onClick={handleShareToWA}
@@ -369,130 +497,6 @@ function InputAbsenContent() {
             Silakan centang kehadiran santri di bawah ini.
           </p>
         </div>
-      </div>
-
-      {/* Upload Foto Kehadiran */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 space-y-3 animate-in fade-in slide-in-from-left-4 duration-300">
-        <label className="block text-sm font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2">
-          <Camera size={18} className="text-indigo-600 dark:text-indigo-400 animate-pulse" />
-          Foto Kehadiran Kelas/Kamar (Opsional)
-        </label>
-
-        {/* Camera live view */}
-        {showCamera && (
-          <div className="rounded-2xl overflow-hidden border-2 border-indigo-400 dark:border-indigo-600 bg-black relative">
-            {/* Camera toolbar */}
-            <div className="flex justify-between items-center bg-gray-900 px-3 py-2">
-              <div className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${facingMode === 'environment' ? 'bg-green-400' : 'bg-blue-400'}`} />
-                <span className="text-xs font-semibold text-gray-300">
-                  {facingMode === 'environment' ? '📷 Kamera Belakang' : '🤳 Kamera Depan'}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={switchCamera}
-                  disabled={isSwitchingCamera}
-                  title={facingMode === 'environment' ? 'Ganti ke Kamera Depan' : 'Ganti ke Kamera Belakang'}
-                  className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl transition-all ${
-                    isSwitchingCamera ? 'bg-gray-600 text-gray-400 cursor-wait' : 'bg-blue-600 hover:bg-blue-500 active:scale-95 text-white'
-                  }`}
-                >
-                  <FlipHorizontal size={14} className={isSwitchingCamera ? 'animate-spin' : ''} />
-                  <span className="hidden sm:inline">
-                    {isSwitchingCamera ? 'Mengganti...' : facingMode === 'environment' ? 'Kamera Depan' : 'Kamera Belakang'}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={closeCamera}
-                  className="bg-red-500 hover:bg-red-600 p-1.5 rounded-lg transition-colors"
-                  aria-label="Tutup Kamera"
-                >
-                  <XIcon size={16} className="text-white" />
-                </button>
-              </div>
-            </div>
-            {/* Video preview */}
-            <div className="relative min-h-[240px] bg-black">
-              {isSwitchingCamera && (
-                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/80 gap-2">
-                  <div className="w-8 h-8 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
-                  <span className="text-white text-xs font-semibold">Mengganti kamera...</span>
-                </div>
-              )}
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full object-cover max-h-[360px]"
-              />
-            </div>
-            {/* Capture button */}
-            <div className="flex justify-center bg-gray-900 py-3 px-4">
-              <button
-                type="button"
-                onClick={capturePhoto}
-                className="bg-white hover:bg-gray-100 active:scale-95 text-gray-900 font-bold px-8 py-2.5 rounded-full shadow-lg transition-all flex items-center gap-2 text-sm"
-              >
-                <Camera size={16} /> Ambil Foto
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Canvas (hidden) for snapshot */}
-        <canvas ref={canvasRef} className="hidden" />
-
-        {/* Buttons & Preview */}
-        <div className="flex flex-wrap items-center gap-3">
-          {!showCamera && (
-            <button
-              type="button"
-              onClick={openCamera}
-              className="cursor-pointer bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-bold px-5 py-3 rounded-xl border border-indigo-200 dark:border-indigo-800 text-sm transition-all flex items-center gap-2"
-            >
-              <Camera size={16} />
-              {photoUrl ? 'Ambil Ulang' : 'Buka Kamera'}
-            </button>
-          )}
-
-          {/* Fallback: file upload for desktop */}
-          <div>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handlePhotoUpload}
-              className="hidden"
-              id="presence-photo-input"
-            />
-            <label
-              htmlFor="presence-photo-input"
-              className="cursor-pointer bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 font-bold px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 text-sm transition-all flex items-center gap-2"
-            >
-              <Image size={16} /> Upload File
-            </label>
-          </div>
-
-          {photoUrl && (
-            <div className="relative w-24 h-24 rounded-xl overflow-hidden border-2 border-indigo-200 dark:border-indigo-700 shadow-sm">
-              <img src={photoUrl} alt="Preview" className="w-full h-full object-cover" />
-              <button
-                type="button"
-                onClick={() => setPhotoUrl('')}
-                className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 shadow-sm transition-colors w-5 h-5 flex items-center justify-center"
-              >
-                <XIcon size={10} />
-              </button>
-            </div>
-          )}
-        </div>
-
-        <p className="text-xs text-gray-400 font-medium">
-          Gunakan tombol <strong>Buka Kamera</strong> untuk foto langsung, atau <strong>Upload File</strong> jika ingin memilih dari galeri.
-        </p>
       </div>
 
       <div className="flex justify-end gap-2 mb-4 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -649,8 +653,15 @@ function InputAbsenContent() {
             disabled={saving || murid.length === 0}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50"
           >
-            {saving ? <Clock className="animate-spin" size={20} /> : <Save size={20} />}
-            {saving ? 'Menyimpan...' : 'Simpan Absensi'}
+            {saving ? (
+              <Clock className="animate-spin" size={20} />
+            ) : (
+              <Save size={20} />
+            )}
+            {saving 
+              ? (sudahAbsen ? 'Memperbarui...' : 'Menyimpan...') 
+              : (sudahAbsen ? 'Perbarui Absensi' : 'Simpan Absensi')
+            }
           </button>
         </div>
       </div>

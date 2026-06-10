@@ -121,22 +121,39 @@ export async function GET() {
 
     const currentSecs = parseTime(currentTime);
 
-    // Determine active status (30 minutes before start, 3 hours after end)
-    const schedulesWithStatus = allSchedules.map(sched => {
+    // Get today's date in YYYY-MM-DD (local timezone)
+    const nowLocal = new Date(Date.now() - d.getTimezoneOffset() * 60000);
+    const todayStr = nowLocal.toISOString().slice(0, 10);
+
+    // Cek absensi yang sudah diisi hari ini untuk setiap jadwal
+    const schedulesWithStatus = await Promise.all(allSchedules.map(async (sched) => {
       const mulaiSecs = parseTime(sched.jam_mulai);
       const selesaiSecs = parseTime(sched.jam_selesai);
-      
       const windowStart = mulaiSecs - 30 * 60;
       const windowEnd = selesaiSecs + 3 * 3600;
-
       const isActive = currentSecs >= windowStart && currentSecs <= windowEnd;
       const isPast = currentSecs > windowEnd;
 
+      // Cek apakah sudah ada record absensi hari ini
+      let sudah_absen = false;
+      try {
+        let checkQuery = '';
+        let checkParams: any[] = [sched.jadwal_id, todayStr];
+        if (sched.tipe === 'madin') checkQuery = 'SELECT 1 FROM absensi WHERE jadwal_madin_id = ? AND tanggal = ? LIMIT 1';
+        else if (sched.tipe === 'quran') checkQuery = 'SELECT 1 FROM absensi_quran WHERE jadwal_quran_id = ? AND tanggal = ? LIMIT 1';
+        else if (sched.tipe === 'kegiatan') checkQuery = 'SELECT 1 FROM absensi_kegiatan WHERE kegiatan_id = ? AND tanggal = ? LIMIT 1';
+        if (checkQuery) {
+          const [checkRows] = await pool.execute<RowDataPacket[]>(checkQuery, checkParams);
+          sudah_absen = checkRows.length > 0;
+        }
+      } catch (e) { /* abaikan error cek */ }
+
       return {
         ...sched,
-        status: isActive ? 'aktif' : (isPast ? 'selesai' : 'menunggu')
+        status: isActive ? 'aktif' : (isPast ? 'selesai' : 'menunggu'),
+        sudah_absen,
       };
-    });
+    }));
 
     // Sort by jam_mulai
     schedulesWithStatus.sort((a: any, b: any) => a.jam_mulai.localeCompare(b.jam_mulai));

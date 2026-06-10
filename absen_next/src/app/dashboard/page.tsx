@@ -219,8 +219,15 @@ export default function DashboardPage() {
                           Hanya Lihat
                         </span>
                       ) : (
-                        <Link href={`/dashboard/absen/input?tipe=${sched.tipe}&kelas_id=${sched.kelas_id}&jadwal_id=${sched.jadwal_id}`} className="px-3 py-1.5 bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 hover:bg-blue-100 text-xs font-bold rounded-lg transition-colors border border-blue-200 dark:border-blue-800">
-                          Isi Absen
+                        <Link 
+                          href={`/dashboard/absen/input?tipe=${sched.tipe}&kelas_id=${sched.kelas_id}&jadwal_id=${sched.jadwal_id}`} 
+                          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors border ${
+                            sched.sudah_absen
+                              ? 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-100'
+                              : 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-100'
+                          }`}
+                        >
+                          {sched.sudah_absen ? 'Perbarui' : 'Isi Absen'}
                         </Link>
                       )}
                     </div>
