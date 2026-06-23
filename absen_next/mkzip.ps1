@@ -23,11 +23,8 @@ Add-FolderToZip "$src\.next" $zip $src @('.next\cache', '.next\dev')
 Write-Output "Zipping public ..."
 Add-FolderToZip "$src\public" $zip $src
 
-Write-Output "Zipping src ..."
-Add-FolderToZip "$src\src" $zip $src
-
 Write-Output "Adding root config files ..."
-@('package.json','package-lock.json','next.config.ts','server.js','postcss.config.mjs','tsconfig.json','next-env.d.ts') | ForEach-Object {
+@('package.json','package-lock.json','next.config.ts','server.js','postcss.config.mjs','tsconfig.json') | ForEach-Object {
     $fp = "$src\$_"
     if (Test-Path $fp) {
         [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $fp, $_) | Out-Null
@@ -36,4 +33,4 @@ Write-Output "Adding root config files ..."
 
 $zip.Dispose()
 $mb = [math]::Round((Get-Item $dest).Length / 1MB, 2)
-Write-Output "SELESAI! deploy.zip = $mb MB -> $dest"
+Write-Output "SELESAI! deploy.zip = $mb MB"

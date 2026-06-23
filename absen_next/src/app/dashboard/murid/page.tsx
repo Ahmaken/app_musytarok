@@ -87,10 +87,6 @@ export default function DataMuridPage() {
   const [allQuran, setAllQuran] = useState<any[]>([]);
   const [allKamar, setAllKamar] = useState<any[]>([]);
 
-  // Jadwal-based filter visibility
-  const [hasQuranJadwal, setHasQuranJadwal] = useState(true);
-  const [hasMadinJadwal, setHasMadinJadwal] = useState(true);
-
   // Export State
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [pdfUrl, setPdfUrl] = useState('');
@@ -128,31 +124,11 @@ export default function DataMuridPage() {
         if (data.success) {
           setRole(data.user.role);
           setUserAsrama(data.user.namaAsrama || null);
-          // Admin/staff selalu lihat semua filter
-          if (data.user.role === 'admin' || data.user.role === 'staff') {
-            setHasQuranJadwal(true);
-            setHasMadinJadwal(true);
-            return;
-          }
         }
       } catch (err) { }
     };
-
-    const fetchJadwalVisibility = async () => {
-      try {
-        const res = await fetch('/api/jadwal');
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data)) {
-          const jadwal: any[] = json.data;
-          setHasQuranJadwal(jadwal.some((j: any) => j.tipe === 'quran'));
-          setHasMadinJadwal(jadwal.some((j: any) => j.tipe === 'madin'));
-        }
-      } catch (err) {}
-    };
-
     fetchMe();
     fetchFilters();
-    fetchJadwalVisibility();
 
     const fetchData = async () => {
       setLoading(true);
@@ -634,29 +610,22 @@ export default function DataMuridPage() {
       {/* Filter Panel */}
       {showFilters && (
         <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 animate-in slide-in-from-top-2 duration-200 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {/* Filter Madin — hanya tampil jika punya jadwal madin (atau admin/staff) */}
-          {hasMadinJadwal && (
-            <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Kelas Madin</label>
-              <select value={filterMadin} onChange={(e) => setFilterMadin(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-teal-500">
-                <option value="">Semua Madin</option>
-                <option value="__none__">Belum ada data kelas madin</option>
-                {allMadin.map(k => <option key={k.id} value={k.nama}>{k.nama}</option>)}
-              </select>
-            </div>
-          )}
-          {/* Filter Qur'an — hanya tampil jika punya jadwal quran (atau admin/staff) */}
-          {hasQuranJadwal && (
-            <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Kelas Qur'an</label>
-              <select value={filterQuran} onChange={(e) => setFilterQuran(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500">
-                <option value="">Semua Qur'an</option>
-                <option value="__none__">Belum ada data kelas qur'an</option>
-                {allQuran.map(k => <option key={k.id} value={k.nama}>{k.nama}</option>)}
-              </select>
-            </div>
-          )}
-          {/* Filter Kamar — selalu tampil */}
+          <div>
+            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Kelas Madin</label>
+            <select value={filterMadin} onChange={(e) => setFilterMadin(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-teal-500">
+              <option value="">Semua Madin</option>
+              <option value="__none__">Belum ada data kelas madin</option>
+              {allMadin.map(k => <option key={k.id} value={k.nama}>{k.nama}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Kelas Qur'an</label>
+            <select value={filterQuran} onChange={(e) => setFilterQuran(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500">
+              <option value="">Semua Qur'an</option>
+              <option value="__none__">Belum ada data kelas qur'an</option>
+              {allQuran.map(k => <option key={k.id} value={k.nama}>{k.nama}</option>)}
+            </select>
+          </div>
           <div>
             <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Kamar Asrama</label>
             <select value={filterKamar} onChange={(e) => setFilterKamar(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-orange-500">

@@ -7,7 +7,6 @@ export default function JadwalPage() {
   const [jadwal, setJadwal] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState('murid');
-  const [rooms, setRooms] = useState<any[]>([]);
 
   const [activeTab, setActiveTab] = useState<'quran' | 'madin' | 'kegiatan'>('quran');
 
@@ -96,31 +95,12 @@ export default function JadwalPage() {
       const res = await fetch('/api/jadwal');
       const json = await res.json();
       if (json.success) setJadwal(json.data);
-
-      // Fetch rooms for kegiatan asrama matching
-      const resRooms = await fetch('/api/kelas?type=kamar');
-      const dataRooms = await resRooms.json();
-      if (dataRooms.success) setRooms(dataRooms.data);
     } catch (err) {
       console.error('Failed to fetch jadwal:', err);
     } finally {
       setLoading(false);
     }
   };
-
-  // Compute available tabs for non-admin/staff users
-  const availableTabs = (['quran', 'madin', 'kegiatan'] as const).filter((tipe) => {
-    if (role === 'admin' || role === 'staff') return true;
-    return jadwal.some((j) => j.tipe === tipe);
-  });
-
-  // Auto-switch activeTab if current tab not available for this user
-  useEffect(() => {
-    if (loading || role === 'admin' || role === 'staff') return;
-    if (availableTabs.length > 0 && !availableTabs.includes(activeTab)) {
-      setActiveTab(availableTabs[0]);
-    }
-  }, [loading, jadwal, role]);
 
   const filteredJadwal = jadwal.filter(j => {
     return j.tipe === activeTab && (filterGuru === '' || j.guru === filterGuru);
@@ -328,20 +308,12 @@ export default function JadwalPage() {
         </div>
       </div>
 
-      {/* Tabs — Only show tabs relevant to the user's schedules (admin/staff see all) */}
-      {availableTabs.length > 0 && (
-        <div className="flex bg-white dark:bg-gray-800 p-1.5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-x-auto">
-          {availableTabs.includes('quran') && (
-            <button onClick={() => { setActiveTab('quran'); setSelectedJadwal([]); }} className={`flex-1 min-w-[120px] py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'quran' ? 'bg-emerald-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>Kelas Qur'an</button>
-          )}
-          {availableTabs.includes('madin') && (
-            <button onClick={() => { setActiveTab('madin'); setSelectedJadwal([]); }} className={`flex-1 min-w-[120px] py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'madin' ? 'bg-teal-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>Kelas Madin</button>
-          )}
-          {availableTabs.includes('kegiatan') && (
-            <button onClick={() => { setActiveTab('kegiatan'); setSelectedJadwal([]); }} className={`flex-1 min-w-[120px] py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'kegiatan' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>Kegiatan Asrama</button>
-          )}
-        </div>
-      )}
+      {/* Tabs */}
+      <div className="flex bg-white dark:bg-gray-800 p-1.5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-x-auto">
+        <button onClick={() => { setActiveTab('quran'); setSelectedJadwal([]); }} className={`flex-1 min-w-[120px] py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'quran' ? 'bg-emerald-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>Kelas Qur'an</button>
+        <button onClick={() => { setActiveTab('madin'); setSelectedJadwal([]); }} className={`flex-1 min-w-[120px] py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'madin' ? 'bg-teal-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>Kelas Madin</button>
+        <button onClick={() => { setActiveTab('kegiatan'); setSelectedJadwal([]); }} className={`flex-1 min-w-[120px] py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'kegiatan' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>Kegiatan Asrama</button>
+      </div>
 
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-x-auto">
         {(role === 'admin' || role === 'staff') && (
@@ -384,10 +356,6 @@ export default function JadwalPage() {
 
       {loading ? (
         <div className="text-center py-12 text-gray-500">Memuat jadwal...</div>
-      ) : availableTabs.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 border border-gray-100 dark:border-gray-700 shadow-sm text-center">
-          <p className="text-gray-500 dark:text-gray-400">Anda belum memiliki jadwal kegiatan yang terdaftar.</p>
-        </div>
       ) : filteredJadwal.length === 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 border border-gray-100 dark:border-gray-700 shadow-sm text-center">
           <p className="text-gray-500 dark:text-gray-400">Tidak ada jadwal {activeTab} yang terdaftar.</p>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Bell, Download, X, Minus } from 'lucide-react';
+import { Bell, Download } from 'lucide-react';
 
 export default function PwaProvider({ children }: { children: React.ReactNode }) {
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
@@ -133,7 +133,7 @@ function DraggableInstallButton({ onInstall, onClose }: { onInstall: () => void,
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
-    setPosition({ x: window.innerWidth - 170, y: window.innerHeight - 80 });
+    setPosition({ x: window.innerWidth - 150, y: window.innerHeight - 80 });
     setIsMounted(true);
   }, []);
 
@@ -156,7 +156,7 @@ function DraggableInstallButton({ onInstall, onClose }: { onInstall: () => void,
     let newY = e.clientY - dragOffset.y;
     
     // Batasi agar tidak keluar layar
-    newX = Math.max(10, Math.min(newX, window.innerWidth - (isMinimized ? 60 : 150)));
+    newX = Math.max(10, Math.min(newX, window.innerWidth - 60));
     newY = Math.max(10, Math.min(newY, window.innerHeight - 60));
     
     setPosition({ x: newX, y: newY });
@@ -188,57 +188,30 @@ function DraggableInstallButton({ onInstall, onClose }: { onInstall: () => void,
       className="cursor-move animate-[slideUp_0.5s_ease-out]"
     >
       <div className="flex flex-col items-end gap-1">
-        {/* Tombol Tutup / Minimize */}
-        {isMinimized ? (
-          <button 
-            onClick={(e) => { 
-              e.stopPropagation(); 
-              localStorage.setItem('pwa_prompt_closed', 'true');
-              window.dispatchEvent(new CustomEvent('pwa-closed'));
-              onClose();
-            }}
-            className="bg-red-600/95 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md border border-white/20 hover:bg-red-700 pointer-events-auto transition-colors"
-            title="Tutup Permanen"
-          >
-            <X size={12} />
-          </button>
-        ) : (
-          <button 
-            onClick={(e) => { 
-              e.stopPropagation(); 
-              setIsMinimized(true);
-            }}
-            className="bg-gray-800/80 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md border border-white/20 hover:bg-gray-700 pointer-events-auto transition-colors"
-            title="Perkecil"
-          >
-            <Minus size={12} />
-          </button>
-        )}
+        {/* Tombol Tutup (X) */}
+        <button 
+          onClick={(e) => { 
+            e.stopPropagation(); 
+            localStorage.setItem('pwa_prompt_closed', 'true');
+            window.dispatchEvent(new CustomEvent('pwa-closed'));
+            onClose();
+          }}
+          className="bg-gray-800/80 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-md border border-white/20 hover:bg-gray-700 pointer-events-auto"
+        >
+          X
+        </button>
         
         {/* Tombol Install Utama */}
-        {isMinimized ? (
-          <button
-            onClick={(e) => { e.stopPropagation(); if (!isDragging) setIsMinimized(false); }}
-            className={`flex items-center justify-center bg-gradient-to-r from-green-700 to-green-900 text-white rounded-full shadow-2xl transition-all border border-white/20 font-medium group pointer-events-auto
-              w-12 h-12
-              ${isDragging ? 'scale-110 shadow-green-900/50' : 'hover:-translate-y-1 hover:shadow-green-900/50'}
-            `}
-            title="Klik untuk memperbesar / Install"
-          >
-            <Download size={20} className="group-hover:animate-bounce" />
-          </button>
-        ) : (
-          <button
-            onClick={(e) => { e.stopPropagation(); if (!isDragging) onInstall(); }}
-            className={`flex items-center gap-2 bg-gradient-to-r from-green-700 to-green-900 text-white rounded-full shadow-2xl transition-all border border-white/20 font-medium group pointer-events-auto
-              px-5 py-3
-              ${isDragging ? 'scale-110 shadow-green-900/50' : 'hover:-translate-y-1 hover:shadow-green-900/50'}
-            `}
-          >
-            <Download size={20} className="group-hover:animate-bounce" />
-            <span className="whitespace-nowrap select-none">Install App</span>
-          </button>
-        )}
+        <button
+          onClick={(e) => { e.stopPropagation(); if (!isDragging) onInstall(); }}
+          className={`flex items-center gap-2 bg-gradient-to-r from-green-700 to-green-900 text-white rounded-full shadow-2xl transition-all border border-white/20 font-medium group pointer-events-auto
+            px-5 py-3
+            ${isDragging ? 'scale-110 shadow-green-900/50' : 'hover:-translate-y-1 hover:shadow-green-900/50'}
+          `}
+        >
+          <Download size={20} className="group-hover:animate-bounce" />
+          <span className="whitespace-nowrap select-none">Install App</span>
+        </button>
       </div>
     </div>
   );

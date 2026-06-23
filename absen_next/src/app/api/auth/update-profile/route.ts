@@ -51,9 +51,6 @@ export async function POST(request: Request) {
 
     // Cek username baru
     if (newUsername && newUsername !== user.username) {
-      if (decoded.role !== 'admin' && decoded.role !== 'staff') {
-        return NextResponse.json({ error: 'Hanya admin atau staff yang dapat mengubah username' }, { status: 403 });
-      }
       const [existing] = await pool.execute<RowDataPacket[]>('SELECT id FROM users WHERE username = ? LIMIT 1', [newUsername]);
       if (existing.length > 0) {
         return NextResponse.json({ error: 'Username sudah digunakan oleh akun lain' }, { status: 400 });

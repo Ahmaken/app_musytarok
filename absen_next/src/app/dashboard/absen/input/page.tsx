@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Users, CheckCircle, XCircle, Clock, AlertTriangle, ArrowLeft, Save, Camera, Image, FlipHorizontal, X as XIcon } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Users, CheckCircle, XCircle, Clock, AlertTriangle, ArrowLeft, Save, Camera, Image } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -25,14 +25,6 @@ function InputAbsenContent() {
   const [photoUrl, setPhotoUrl] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [sudahAbsen, setSudahAbsen] = useState(false);
-
-  // Camera state
-  const [showCamera, setShowCamera] = useState(false);
-  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
-  const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     if (!tipe || !kelas_id || !jadwal_id) {
@@ -102,8 +94,10 @@ function InputAbsenContent() {
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     setUploadingPhoto(true);
     try {
+      // Kita tidak lagi mengunggah ke server untuk menghemat ruang, melainkan hanya menyimpan blob URL di client
       const localUrl = URL.createObjectURL(file);
       setPhotoUrl(localUrl);
     } catch (err) {
@@ -112,65 +106,6 @@ function InputAbsenContent() {
       setUploadingPhoto(false);
     }
   };
-
-  // --- Camera helpers ---
-  const stopCameraStream = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
-    }
-  }, []);
-
-  const startCamera = useCallback(async (facing: 'environment' | 'user') => {
-    stopCameraStream();
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: facing },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-    } catch (err) {
-      alert('Tidak dapat mengakses kamera. Pastikan izin kamera sudah diberikan dan halaman diakses via HTTPS.');
-      setShowCamera(false);
-    }
-  }, [stopCameraStream]);
-
-  const openCamera = () => {
-    setShowCamera(true);
-    setTimeout(() => startCamera(facingMode), 150);
-  };
-
-  const closeCamera = () => {
-    stopCameraStream();
-    setShowCamera(false);
-  };
-
-  const switchCamera = async () => {
-    if (isSwitchingCamera) return;
-    setIsSwitchingCamera(true);
-    const newFacing = facingMode === 'environment' ? 'user' : 'environment';
-    setFacingMode(newFacing);
-    await startCamera(newFacing);
-    setIsSwitchingCamera(false);
-  };
-
-  const capturePhoto = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d')?.drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-    setPhotoUrl(dataUrl);
-    closeCamera();
-  };
-
-  // Cleanup on unmount
-  useEffect(() => { return () => stopCameraStream(); }, [stopCameraStream]);
 
   const generateWaGroupMessage = () => {
     const dateStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -497,6 +432,46 @@ function InputAbsenContent() {
             Silakan centang kehadiran santri di bawah ini.
           </p>
         </div>
+      </div>
+
+      {/* Upload Foto Kehadiran */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 space-y-3 animate-in fade-in slide-in-from-left-4 duration-300">
+        <label className="block text-sm font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2">
+          <Camera size={18} className="text-indigo-600 dark:text-indigo-400 animate-pulse" />
+          Foto Kehadiran Kelas/Kamar (Opsional)
+        </label>
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handlePhotoUpload}
+            className="hidden"
+            id="presence-photo-input"
+          />
+          <label
+            htmlFor="presence-photo-input"
+            className="cursor-pointer bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-bold px-5 py-3 rounded-xl border border-indigo-200 dark:border-indigo-800 text-sm transition-all flex items-center gap-2"
+          >
+            {uploadingPhoto ? 'Mengunggah...' : photoUrl ? 'Ganti Foto' : 'Ambil/Unggah Foto'}
+          </label>
+          
+          {photoUrl && (
+            <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+              <img src={photoUrl} alt="Preview" className="w-full h-full object-cover" />
+              <button 
+                type="button" 
+                onClick={() => setPhotoUrl('')}
+                className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 shadow-sm transition-colors text-[10px] w-5 h-5 flex items-center justify-center font-bold"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+        </div>
+        <p className="text-xs text-gray-400 font-medium">
+          Guru tugas/pengurus dapat langsung mengambil foto suasana kelas/kamar menggunakan kamera HP.
+        </p>
       </div>
 
       <div className="flex justify-end gap-2 mb-4 animate-in fade-in slide-in-from-right-4 duration-300">

@@ -12,7 +12,6 @@ export default function DashboardPage() {
   const [showFullPic, setShowFullPic] = useState(false);
   
   const [schedules, setSchedules] = useState<any[]>([]);
-  const [allSchedules, setAllSchedules] = useState<any[]>([]);
   const [loadingSchedules, setLoadingSchedules] = useState(true);
   
   const [dateStr, setDateStr] = useState('');
@@ -31,7 +30,7 @@ export default function DashboardPage() {
         const res = await fetch('/api/auth/me');
         const data = await res.json();
         if (data.success && data.user) {
-          setUsername(data.user.real_name || data.user.username);
+          setUsername(data.user.username);
           setRole(data.user.role);
         } else {
           setUsername('Tamu');
@@ -62,21 +61,8 @@ export default function DashboardPage() {
       }
     };
 
-    const fetchAllSchedules = async () => {
-      try {
-        const res = await fetch('/api/jadwal');
-        const json = await res.json();
-        if (res.ok && json.success) {
-          setAllSchedules(json.data);
-        }
-      } catch (err) {
-        console.error('Failed to fetch all schedules', err);
-      }
-    };
-
     fetchUser();
     fetchSchedules();
-    fetchAllSchedules();
 
     // Populate dates on mount to avoid hydration mismatch
     const localDate = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace('Minggu', 'Ahad');
@@ -189,7 +175,7 @@ export default function DashboardPage() {
 
       {/* Daftar Jadwal Hari Ini */}
       <section className="space-y-4">
-        {['kegiatan', 'quran', 'madin'].filter(tipe => role === 'admin' || role === 'staff' || allSchedules.some(s => s.tipe === tipe)).map(tipe => {
+        {['kegiatan', 'quran', 'madin'].filter(tipe => role === 'admin' || role === 'staff' || schedules.some(s => s.tipe === tipe)).map(tipe => {
           const tipeName = tipe === 'kegiatan' ? 'Kegiatan' : tipe === 'quran' ? "Qur'an" : 'Madin';
           const Icon = tipe === 'kegiatan' ? Clock : BookOpen;
           const tipeSchedules = schedules.filter(s => s.tipe === tipe);
@@ -275,7 +261,7 @@ export default function DashboardPage() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {['quran', 'madin', 'kegiatan'].filter(tipe => role === 'admin' || role === 'staff' || allSchedules.some(s => s.tipe === tipe)).map((tipe) => {
+          {['quran', 'madin', 'kegiatan'].filter(tipe => role === 'admin' || role === 'staff' || schedules.some(s => s.tipe === tipe)).map((tipe) => {
             const tipeName = tipe === 'quran' ? 'Qur\'an' : tipe === 'madin' ? 'Madin' : 'Kegiatan';
             return (
             <div key={tipe} className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 transition-colors duration-300">
