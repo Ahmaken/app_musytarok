@@ -29,9 +29,34 @@ export async function GET() {
       if (creds.length > 0) hasFingerprint = true;
     }
 
+    // Retrieve real name — wrapped in separate try-catch so failure is non-fatal
+    let realName = payload.username;
+    try {
+      if (payload.role === 'guru' && payload.guruId) {
+        const [gurus] = await pool.execute<RowDataPacket[]>(
+          'SELECT nama FROM guru WHERE guru_id = ? LIMIT 1',
+          [payload.guruId]
+        );
+        if (gurus.length > 0) {
+          realName = gurus[0].nama;
+        }
+      } else if (payload.userId) {
+        const [users] = await pool.execute<RowDataPacket[]>(
+          'SELECT nama FROM users WHERE id = ? LIMIT 1',
+          [payload.userId]
+        );
+        if (users.length > 0 && users[0].nama) {
+          realName = users[0].nama;
+        }
+      }
+    } catch (nameErr) {
+      // Non-fatal: fall back to username if real_name query fails
+      console.warn('[auth/me] Could not fetch real_name:', nameErr);
+    }
+
     return NextResponse.json({
       success: true,
-      user: { ...payload, has_fingerprint: hasFingerprint }
+      user: { ...payload, real_name: realName, has_fingerprint: hasFingerprint }
     });
   } catch (error) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
