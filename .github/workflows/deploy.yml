@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - feature/development # Menjalankan workflow saat push ke main atau feature/development
+      - feature/development
 
 jobs:
   build-and-deploy:
@@ -29,7 +29,9 @@ jobs:
       - name: Prepare Production Files
         run: |
           mkdir deploy_dist
+          # Salin .next tapi TANPA folder cache (terlalu besar)
           cp -r .next deploy_dist/
+          rm -rf deploy_dist/.next/cache
           cp -r public deploy_dist/
           cp package.json deploy_dist/
           cp package-lock.json deploy_dist/
@@ -42,9 +44,13 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          # Menunjuk ke folder dist produksi agar transfer cepat & bersih
           local-dir: ./deploy_dist/
-          # Tentukan target direktori menggunakan secret yang sudah di-set
           server-dir: ${{ secrets.FTP_TARGET_DIR }}
-          # Mengabaikan pengecekan perubahan lama untuk menjamin kecocokan penuh
           dangerous-clean-slate: false
+          # Timeout diperpanjang menjadi 10 menit untuk koneksi lambat
+          timeout: 600000
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/.next/cache/**
