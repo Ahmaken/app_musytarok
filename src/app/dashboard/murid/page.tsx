@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Users, Search, Plus, Filter, User, MapPin, CheckSquare, Edit, UserPlus, Camera, RefreshCw, FileText, Download, X } from 'lucide-react';
+import { Users, Search, Plus, Filter, User, MapPin, CheckSquare, Edit, UserPlus, Camera, RefreshCw, FileText, Download, X, Upload, TableProperties } from 'lucide-react';
 import { exportToPDF, exportToExcel } from '@/lib/exportUtils';
+import { downloadTemplate } from '@/lib/downloadTemplate';
 import Link from 'next/link';
 
 // ====== Avatar Lokal (tanpa service eksternal) ======
@@ -94,6 +95,39 @@ export default function DataMuridPage() {
   // Export State
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [pdfUrl, setPdfUrl] = useState('');
+
+  // Import Excel State
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<any>(null);
+
+  const handleImportExcel = async () => {
+    if (!importFile) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', importFile);
+      fd.append('type', 'murid');
+      const res = await fetch('/api/import', { method: 'POST', body: fd });
+      const json = await res.json();
+      setImportResult(json);
+      if (json.success) {
+        // Refresh data murid setelah impor berhasil
+        const refreshRes = await fetch('/api/murid');
+        const refreshJson = await refreshRes.json();
+        if (refreshJson.success) {
+          setMurid(refreshJson.data);
+          fetchFilters();
+        }
+      }
+    } catch (err) {
+      setImportResult({ success: false, error: 'Gagal menghubungi server' });
+    } finally {
+      setImporting(false);
+    }
+  };
 
 
   const fetchFilters = async () => {
@@ -514,7 +548,7 @@ export default function DataMuridPage() {
         <div className="absolute top-0 right-0 -mt-4 -mr-4 text-blue-200/50 dark:text-blue-800/30">
           <Users size={120} />
         </div>
-        <div className="relative z-10 flex items-start justify-between">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-extrabold text-blue-800 dark:text-blue-400 drop-shadow-sm flex items-center gap-2">
               <Users size={28} /> Data Santri
@@ -523,13 +557,47 @@ export default function DataMuridPage() {
               Manajemen informasi santri PPTQ. Total {murid.length} santri terdaftar.
             </p>
           </div>
-          {(role === 'admin' || role === 'staff') && (
-            <div className="flex gap-2">
-              <button className="bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-full shadow-lg transition-transform hover:scale-105 flex items-center justify-center" title="Tambah Santri">
-                <Plus size={20} />
-              </button>
-            </div>
-          )}
+          <div className="flex flex-wrap w-full md:w-auto gap-2 self-start md:self-center">
+            <button
+              onClick={() => handleExport('pdf', true)}
+              className="flex-1 md:flex-none justify-center px-3 py-2 bg-white/85 dark:bg-gray-800/80 text-gray-700 dark:text-gray-200 border border-blue-200 dark:border-blue-800 rounded-xl text-xs font-bold hover:bg-white dark:hover:bg-gray-800 transition-colors flex items-center gap-1.5"
+              title="Preview PDF"
+            >
+              <FileText size={14} /> Preview
+            </button>
+            <button
+              onClick={() => handleExport('pdf', false)}
+              className="flex-1 md:flex-none justify-center px-3 py-2 bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors flex items-center gap-1.5"
+              title="Export PDF"
+            >
+              <Download size={14} /> PDF
+            </button>
+            <button
+              onClick={() => handleExport('excel', false)}
+              className="flex-1 md:flex-none justify-center px-3 py-2 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800 rounded-xl text-xs font-bold hover:bg-green-100 transition-colors flex items-center gap-1.5"
+              title="Export Excel"
+            >
+              <Download size={14} /> Excel
+            </button>
+            {(role === 'admin' || role === 'staff') && (
+              <>
+                <button
+                  onClick={() => downloadTemplate('murid')}
+                  className="flex-1 md:flex-none justify-center px-3 py-2 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors flex items-center gap-1.5"
+                  title="Unduh Templat Excel Murid"
+                >
+                  <TableProperties size={14} /> Templat
+                </button>
+                <button
+                  onClick={() => { setImportFile(null); setImportResult(null); setIsImportModalOpen(true); }}
+                  className="flex-1 md:flex-none justify-center px-3 py-2 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded-xl text-xs font-bold hover:bg-amber-100 transition-colors flex items-center gap-1.5"
+                  title="Impor Data Santri dari Excel"
+                >
+                  <Upload size={14} /> Impor
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -581,17 +649,7 @@ export default function DataMuridPage() {
           <Filter size={18} /> <span className="ml-2 text-xs font-bold sm:hidden">Filter</span>
         </button>
 
-        <div className="grid grid-cols-3 gap-2 w-full sm:w-auto sm:flex sm:ml-auto">
-          <button onClick={() => handleExport('pdf', true)} className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-xl text-xs font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" title="Preview PDF">
-            <FileText size={14} /> Preview
-          </button>
-          <button onClick={() => handleExport('pdf', false)} className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors" title="Export PDF">
-            <Download size={14} /> PDF
-          </button>
-          <button onClick={() => handleExport('excel', false)} className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800 rounded-xl text-xs font-bold hover:bg-green-100 transition-colors" title="Export Excel">
-            <Download size={14} /> Excel
-          </button>
-        </div>
+
       </div>
 
       {/* Filter Panel */}
@@ -1158,6 +1216,52 @@ export default function DataMuridPage() {
                 >
                   <Download size={18} /> Unduh PDF
                 </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl w-full max-w-md border border-gray-100 dark:border-gray-700 animate-in fade-in zoom-in duration-200 overflow-hidden">
+            <div className="bg-blue-600 dark:bg-blue-900 p-5 text-white flex justify-between items-center">
+              <h2 className="text-lg font-bold flex items-center gap-2"><Upload size={20} /> Impor Data Santri</h2>
+              <button onClick={() => setIsImportModalOpen(false)} className="bg-white/20 p-1.5 rounded-lg hover:bg-white/30"><X size={18} /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-2">Pilih File Excel (.xlsx)</label>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={(e) => { setImportFile(e.target.files?.[0] || null); setImportResult(null); }}
+                  className="w-full text-sm text-gray-600 dark:text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+              </div>
+              {importResult && (
+                <div className={`p-3 rounded-xl text-sm ${importResult.success ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'}`}>
+                  <p className="font-bold">{importResult.success ? '✓ Berhasil' : '✗ Gagal'}</p>
+                  <p>{importResult.message || importResult.error}</p>
+                  {importResult.details?.errors?.length > 0 && (
+                    <ul className="mt-2 list-disc list-inside text-xs space-y-0.5">
+                      {importResult.details.errors.slice(0, 5).map((e: string, i: number) => <li key={i}>{e}</li>)}
+                      {importResult.details.errors.length > 5 && <li>...dan {importResult.details.errors.length - 5} error lainnya</li>}
+                    </ul>
+                  )}
+                </div>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setIsImportModalOpen(false)} className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-200 transition-colors">
+                  Tutup
+                </button>
+                <button
+                  onClick={handleImportExcel}
+                  disabled={!importFile || importing}
+                  className="flex-1 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {importing ? <><span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> Mengimpor...</> : <><Upload size={16} /> Impor</>}
+                </button>
               </div>
             </div>
           </div>
