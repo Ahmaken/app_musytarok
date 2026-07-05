@@ -37,9 +37,9 @@ jobs:
           cp package-lock.json deploy_dist/
           cp next.config.ts deploy_dist/
           cp server.js deploy_dist/
-          # Buat trigger restart otomatis untuk Passenger di cPanel
+          # Buat trigger restart otomatis untuk Passenger di cPanel dengan konten dinamis
           mkdir -p deploy_dist/tmp
-          touch deploy_dist/tmp/restart.txt
+          echo "Deploy SHA: ${{ github.sha }} | Time: $(date +%s)" > deploy_dist/tmp/restart.txt
 
 
       - name: Deploy to cPanel via FTP
