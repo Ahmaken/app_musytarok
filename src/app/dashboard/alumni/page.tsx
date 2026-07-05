@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { GraduationCap, Search, Edit, Trash2, RotateCcw, Download, FileText, X, Plus } from 'lucide-react';
+import { GraduationCap, Search, Edit, Trash2, RotateCcw, Download, FileText, Upload, X, Plus } from 'lucide-react';
+import { downloadTemplate } from '@/lib/downloadTemplate';
 
 export default function AlumniManagementPage() {
   const [alumni, setAlumni] = useState<any[]>([]);
@@ -9,6 +10,39 @@ export default function AlumniManagementPage() {
   const [search, setSearch] = useState('');
   const [filterKategori, setFilterKategori] = useState(''); // '' means All, 'PPM', 'LPPM'
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Import State
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+
+  const handleImportExcel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!importFile) return;
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', importFile);
+      formData.append('type', 'alumni');
+      const res = await fetch('/api/import', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message);
+        setIsImportModalOpen(false);
+        setImportFile(null);
+        fetchAlumni();
+      } else {
+        alert(data.error || 'Gagal mengimpor data');
+      }
+    } catch {
+      alert('Terjadi kesalahan koneksi');
+    } finally {
+      setImporting(false);
+    }
+  };
 
   // Helper untuk menentukan URL Foto Santri (Lokal vs Mitra)
   const getFotoUrl = (fotoName: string | null) => {
@@ -143,6 +177,28 @@ export default function AlumniManagementPage() {
     }
   };
 
+  const handleOpenCreateModal = () => {
+    setEditingAlumni(null);
+    setFormData({
+      alumni_id: '',
+      nama: '',
+      nis: '',
+      nik: '',
+      no_hp: '',
+      alamat: '',
+      tahun_masuk: '',
+      tahun_keluar: '',
+      status_keluar: 'Lulus',
+      jenis_kelamin: 'Laki-laki',
+      kategori_mukim: 'PPM',
+      keterangan: '',
+      kamar: '',
+      madin: '',
+      quran: ''
+    });
+    setShowModal(true);
+  };
+
   const handleOpenEditModal = (item: any) => {
     setEditingAlumni(item);
     
@@ -188,8 +244,9 @@ export default function AlumniManagementPage() {
       if (formData.quran) parts.push(`Qur'an: ${formData.quran}`);
       const updatedKeterangan = parts.join(' | ');
 
+      const isNew = !editingAlumni;
       const res = await fetch('/api/alumni', {
-        method: 'PUT',
+        method: isNew ? 'POST' : 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
@@ -257,13 +314,50 @@ export default function AlumniManagementPage() {
         <div className="absolute top-0 right-0 -mt-4 -mr-4 text-green-200/50 dark:text-green-800/20">
           <GraduationCap size={120} />
         </div>
-        <div className="relative z-10">
-          <h1 className="text-2xl font-extrabold text-green-800 dark:text-green-400 drop-shadow-sm flex items-center gap-2">
-            Manajemen Data Alumni
-          </h1>
-          <p className="text-green-600 dark:text-green-300 text-sm mt-1 font-medium max-w-lg">
-            Daftar santri/murid yang telah diluluskan. Anda dapat mengedit data, menghapus permanen, atau memulihkan statusnya menjadi santri aktif.
-          </p>
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-extrabold text-green-800 dark:text-green-400 drop-shadow-sm flex items-center gap-2">
+              Manajemen Data Alumni
+            </h1>
+            <p className="text-green-600 dark:text-green-300 text-sm mt-1 font-medium max-w-lg">
+              Daftar santri/murid yang telah diluluskan. Anda dapat mengedit data, menghapus permanen, atau memulihkan statusnya menjadi santri aktif.
+            </p>
+          </div>
+          <div className="flex flex-wrap w-full md:w-auto gap-2 self-start md:self-center">
+            <button onClick={() => handleExport('pdf', true)} className="flex-1 md:flex-none justify-center px-3 py-2 bg-white/85 dark:bg-gray-800/80 text-gray-700 dark:text-gray-200 border border-green-200 dark:border-green-800 rounded-xl text-xs font-bold hover:bg-white dark:hover:bg-gray-800 transition-colors flex items-center gap-1.5" title="Preview PDF">
+              <FileText size={14} /> Preview
+            </button>
+            <button onClick={() => handleExport('pdf', false)} className="flex-1 md:flex-none justify-center px-3 py-2 bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors flex items-center gap-1.5" title="Export PDF">
+              <Download size={14} /> PDF
+            </button>
+            <button onClick={() => handleExport('excel', false)} className="flex-1 md:flex-none justify-center px-3 py-2 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800 rounded-xl text-xs font-bold hover:bg-green-100 transition-colors flex items-center gap-1.5" title="Export Excel">
+              <Download size={14} /> Excel
+            </button>
+            <button
+              type="button"
+              onClick={() => downloadTemplate('alumni')}
+              className="flex-1 md:flex-none justify-center px-3 py-2 bg-white text-green-700 border border-green-200 rounded-xl text-xs font-bold hover:bg-green-50 transition-colors flex items-center gap-1.5"
+              title="Unduh Templat Excel"
+            >
+              <Download size={14} /> Templat
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsImportModalOpen(true)}
+              className="flex-1 md:flex-none justify-center px-3 py-2 bg-white text-green-700 border border-green-200 rounded-xl text-xs font-bold hover:bg-green-50 transition-colors flex items-center gap-1.5"
+              title="Impor Excel"
+            >
+              <Upload size={14} /> Impor
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenCreateModal}
+              className="flex-1 md:flex-none justify-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+              title="Tambah Alumni"
+            >
+              <Plus size={14} /> Tambah
+            </button>
+          </div>
         </div>
       </div>
 
@@ -298,18 +392,7 @@ export default function AlumniManagementPage() {
                 <option value="LPPM">LPPM (Tidak Mukim)</option>
               </select>
 
-              {/* Baris 3: Tombol Ekspor - Full Width di Mobile */}
-              <div className="grid grid-cols-3 gap-2 w-full sm:flex sm:gap-2">
-                <button onClick={() => handleExport('pdf', true)} className="flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-xl text-xs font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" title="Preview PDF">
-                  <FileText size={14} /> Preview
-                </button>
-                <button onClick={() => handleExport('pdf', false)} className="flex items-center justify-center gap-1.5 px-3 py-2 bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors" title="Export PDF">
-                  <Download size={14} /> PDF
-                </button>
-                <button onClick={() => handleExport('excel', false)} className="flex items-center justify-center gap-1.5 px-3 py-2 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800 rounded-xl text-xs font-bold hover:bg-green-100 transition-colors" title="Export Excel">
-                  <Download size={14} /> Excel
-                </button>
-              </div>
+
             </div>
           </div>
 
@@ -430,7 +513,7 @@ export default function AlumniManagementPage() {
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white dark:bg-gray-800 rounded-t-3xl sm:rounded-3xl w-full max-w-md shadow-2xl animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200 flex flex-col max-h-[92vh]">
             <div className="bg-green-600 px-6 py-4 flex justify-between items-center text-white shrink-0 rounded-t-3xl">
-              <h3 className="font-bold">Edit Data Alumni</h3>
+              <h3 className="font-bold">{editingAlumni ? 'Edit Data Alumni' : 'Tambah Data Alumni'}</h3>
               <button type="button" onClick={() => setShowModal(false)} className="text-white/70 hover:text-white font-bold p-1">✕</button>
             </div>
             
@@ -618,6 +701,56 @@ export default function AlumniManagementPage() {
             className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl animate-[zoomIn_0.2s_ease-out]"
             onClick={(e) => e.stopPropagation()}
           />
+        </div>
+      )}
+      {/* Import Excel Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl w-full max-w-md border border-gray-100 dark:border-gray-700 flex flex-col overflow-hidden">
+            <div className="bg-green-700 dark:bg-green-900 p-5 text-white flex justify-between items-center">
+              <h2 className="text-xl font-bold flex items-center gap-2"><Upload size={20} /> Impor Data Alumni</h2>
+              <button onClick={() => { setIsImportModalOpen(false); setImportFile(null); }} className="text-white hover:text-gray-200"><X size={20} /></button>
+            </div>
+            <form onSubmit={handleImportExcel} className="p-6 space-y-4">
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Silakan pilih file Excel (.xlsx) dengan kolom yang disesuaikan dengan templat yang disediakan.
+                Data alumni dengan NIS atau Nama yang sama akan diperbarui (timpa data lama) secara otomatis untuk menghindari duplikasi.
+              </p>
+              <div className="border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-2xl p-6 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors relative">
+                <input
+                  type="file"
+                  accept=".xlsx"
+                  required
+                  onChange={(e) => {
+                    const files = e.target.files;
+                    if (files && files.length > 0) setImportFile(files[0]);
+                  }}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                <Upload size={32} className="mx-auto text-green-600 mb-2" />
+                <span className="text-xs font-bold text-gray-700 dark:text-gray-300 block">
+                  {importFile ? importFile.name : 'Pilih File Excel (.xlsx)'}
+                </span>
+                <span className="text-[10px] text-gray-400 block mt-1">Maksimal ukuran file: 10MB</span>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setIsImportModalOpen(false); setImportFile(null); }}
+                  className="px-5 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-300 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={importing || !importFile}
+                  className="px-5 py-2.5 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl transition-colors disabled:opacity-50"
+                >
+                  {importing ? 'Mengimpor...' : 'Mulai Impor'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

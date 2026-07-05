@@ -461,18 +461,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </Link>
             </li>
             <li>
+              <Link href="/dashboard/jurnal" onClick={() => setShowSidebar(false)} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${pathname === '/dashboard/jurnal' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-bold' : 'hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold'}`}>
+                <BookOpen size={18} /> <span className="text-sm">Jurnal Kegiatan</span>
+              </Link>
+            </li>
+            <li>
+              <Link href="/dashboard/jadwal-alumni" onClick={() => setShowSidebar(false)} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${pathname === '/dashboard/jadwal-alumni' ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-bold' : 'hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-600 dark:text-amber-400 font-bold'}`}>
+                <CalendarDays size={18} /> <span className="text-sm">Jadwal Alumni</span>
+              </Link>
+            </li>
+            <li>
               <Link href="/dashboard/kurikulum" onClick={() => setShowSidebar(false)} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${pathname === '/dashboard/kurikulum' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 font-bold' : 'hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-bold'}`}>
                 <BookOpen size={18} /> <span className="text-sm">Kurikulum Madin</span>
               </Link>
             </li>
-            {['admin', 'staff', 'wali_murid'].includes(user?.role || '') && (
-            <li>
-              <Link href="/dashboard/billing" onClick={() => setShowSidebar(false)} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${pathname === '/dashboard/billing' ? 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 font-bold' : 'hover:bg-orange-50 dark:hover:bg-orange-900/20 text-orange-600 dark:text-orange-400 font-bold'}`}>
-                <CreditCard size={18} /> <span className="text-sm">Info Tagihan</span>
-              </Link>
-            </li>
-            )}
-            {(user?.role === 'admin' || user?.role === 'pengurus_asrama' || user?.role === 'staff') && (
+
+            {(user?.role === 'admin' || user?.role === 'pengurus_asrama' || user?.role === 'pengasuh' || user?.role === 'staff') && (
             <li>
               <Link href="/dashboard/scan-absen" onClick={() => setShowSidebar(false)} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${pathname === '/dashboard/scan-absen' ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-bold' : 'hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600 dark:text-green-400 font-bold'}`}>
                 <QrCode size={18} /> <span className="text-sm">Scan Absensi</span>
@@ -560,7 +564,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         
         <div className="p-4 border-t dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 flex flex-col gap-2">
           <a 
-            href={`https://wa.me/${nomorCs.replace(/\D/g, '')}?text=${encodeURIComponent('Assalamu\'alaikum, Admin PPTQ. Saya butuh bantuan terkait sistem absensi.')}`}
+            href={`https://wa.me/${nomorCs.replace(/\D/g, '')}?text=${encodeURIComponent('Assalamu\'alaikum, Admin PPMA. Saya butuh bantuan terkait sistem absensi.')}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex w-full items-center gap-3 px-4 py-3 rounded-xl bg-[#25D366] hover:bg-[#1DA851] text-white transition-colors font-bold shadow-sm"

@@ -16,7 +16,7 @@ async function getAuth() {
   return payload;
 }
 
-// POST: Import Excel data
+// POST: Import Excel data (guru, alumni, jadwal)
 export async function POST(request: Request) {
   try {
     const auth = await getAuth();
@@ -35,46 +35,39 @@ export async function POST(request: Request) {
     const arrayBuffer = await file.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
 
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    const rawData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-    if (rawData.length < 2) {
-      return NextResponse.json({ error: 'File Excel kosong atau hanya berisi header' }, { status: 400 });
-    }
-
-    // Cari baris header (skip baris judul/subtitle jika ada)
-    let headerRowIndex = 0;
-    for (let i = 0; i < Math.min(rawData.length, 10); i++) {
-      const row = rawData[i];
-      if (row && row.length >= 2) {
-        const firstCell = String(row[0] || '').toUpperCase().trim();
-        if (
-          firstCell === 'NIS' || firstCell === 'NAMA' || firstCell === 'NAMA LENGKAP' ||
-          firstCell === 'NIP' || firstCell === 'USERNAME' || firstCell === 'NAMA KELAS' ||
-          firstCell === 'NAMA KAMAR' || firstCell === 'HARI' || firstCell === 'TANGGAL' ||
-          firstCell === 'TANGGAL (YYYY-MM-DD)'
-        ) {
-          headerRowIndex = i;
-          break;
-        }
-      }
-    }
-
-    const headers = rawData[headerRowIndex].map((h: any) => String(h || '').toUpperCase().trim());
-    const dataRows = rawData.slice(headerRowIndex + 1).filter((row: any[]) =>
-      row.some(cell => cell !== null && cell !== undefined && cell !== '')
-    );
-
     let result: { inserted: number; updated: number; skipped: number; errors: string[] };
 
-    switch (type) {
-      case 'murid':
-        result = await importMurid(dataRows, headers);
-        break;
-      case 'guru':
-        result = await importGuru(dataRows, headers);
-        break;
+    if (type === 'billing') {
+      result = await importBilling(workbook);
+    } else {
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const rawData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+      if (rawData.length < 2) {
+        return NextResponse.json({ error: 'File Excel kosong atau hanya berisi header' }, { status: 400 });
+      }
+
+      // Cari baris header (skip baris judul/subtitle jika ada)
+      let headerRowIndex = 0;
+      for (let i = 0; i < Math.min(rawData.length, 10); i++) {
+        const row = rawData[i];
+        if (row && row.length >= 3) {
+          const firstCell = String(row[0] || '').toUpperCase().trim();
+          if (firstCell === 'NO' || firstCell === 'NIP' || firstCell === 'NAMA' || firstCell === 'NIS' || firstCell === 'HARI') {
+            headerRowIndex = i;
+            break;
+          }
+        }
+      }
+
+      const headers = rawData[headerRowIndex].map((h: any) => String(h || '').toUpperCase().trim());
+      const dataRows = rawData.slice(headerRowIndex + 1).filter((row: any[]) => row.some(cell => cell !== null && cell !== undefined && cell !== ''));
+
+      switch (type) {
+        case 'guru':
+          result = await importGuru(dataRows, headers);
+          break;
       case 'alumni':
         result = await importAlumni(dataRows, headers);
         break;
@@ -95,6 +88,9 @@ export async function POST(request: Request) {
         break;
       case 'jurnal_kamar':
         result = await importJurnal(dataRows, headers, 'kamar', auth.userId);
+        break;
+      case 'jadwal_alumni':
+        result = await importJadwalAlumni(dataRows, headers);
         break;
       case 'ketertiban':
         result = await importKetertiban(dataRows, headers);
@@ -117,8 +113,12 @@ export async function POST(request: Request) {
       case 'kurikulum':
         result = await importKurikulum(dataRows, headers);
         break;
+      case 'murid':
+        result = await importMurid(dataRows, headers);
+        break;
       default:
         return NextResponse.json({ error: `Tipe impor "${type}" tidak valid` }, { status: 400 });
+    }
     }
 
     return NextResponse.json({
@@ -130,153 +130,6 @@ export async function POST(request: Request) {
     console.error('Error POST /api/import:', error);
     return NextResponse.json({ error: 'Server error: ' + error.message }, { status: 500 });
   }
-}
-
-// ─── HELPER FUNCTIONS ───────────────────────────────────────────────────────
-
-function findCol(headers: string[], aliases: string[]): number {
-  for (const alias of aliases) {
-    const idx = headers.indexOf(alias);
-    if (idx !== -1) return idx;
-  }
-  // Partial match
-  for (const alias of aliases) {
-    const idx = headers.findIndex(h => h.includes(alias));
-    if (idx !== -1) return idx;
-  }
-  return -1;
-}
-
-function formatTime(value: any): string {
-  if (value === null || value === undefined) return '00:00';
-  const str = String(value).trim();
-  if (!isNaN(Number(str)) && Number(str) < 1 && Number(str) > 0) {
-    const totalMinutes = Math.round(Number(str) * 24 * 60);
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-  }
-  const match = str.match(/^(\d{1,2}):(\d{2})/);
-  if (match) return `${match[1].padStart(2, '0')}:${match[2]}`;
-  return str;
-}
-
-async function resolveTempatId(tipe: string, nama: string): Promise<number | null> {
-  let rows: RowDataPacket[] = [];
-  if (tipe === 'madin') {
-    [rows] = await pool.execute<RowDataPacket[]>(
-      'SELECT kelas_id as id FROM kelas_madin WHERE nama_kelas LIKE ? LIMIT 1', [`%${nama}%`]
-    );
-  } else if (tipe === 'quran') {
-    [rows] = await pool.execute<RowDataPacket[]>(
-      'SELECT id FROM kelas_quran WHERE nama_kelas LIKE ? LIMIT 1', [`%${nama}%`]
-    );
-  } else if (tipe === 'kegiatan' || tipe === 'kamar') {
-    [rows] = await pool.execute<RowDataPacket[]>(
-      'SELECT kamar_id as id FROM kamar WHERE nama_kamar LIKE ? LIMIT 1', [`%${nama}%`]
-    );
-  }
-  return rows.length > 0 ? rows[0].id : null;
-}
-
-// ─── IMPORT MURID ───────────────────────────────────────────────────────────
-async function importMurid(rows: any[][], headers: string[]) {
-  const result = { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] };
-
-  const colNIS = findCol(headers, ['NIS']);
-  const colNama = findCol(headers, ['NAMA LENGKAP', 'NAMA']);
-  const colNamaPanggilan = findCol(headers, ['NAMA PANGGILAN', 'PANGGILAN']);
-  const colJK = findCol(headers, ['JENIS KELAMIN', 'J. KELAMIN', 'JK', 'GENDER']);
-  const colNIK = findCol(headers, ['NIK']);
-  const colHP = findCol(headers, ['NO HP', 'NO. HP', 'WHATSAPP', 'NO HP/WA']);
-  const colAlamat = findCol(headers, ['ALAMAT']);
-  const colNamaWali = findCol(headers, ['NAMA WALI', 'WALI', 'ORANG TUA']);
-  const colNoWali = findCol(headers, ['NO HP WALI', 'NO WALI', 'HP WALI', 'WA WALI', 'NO. HP WALI']);
-
-  if (colNama === -1) {
-    result.errors.push('Kolom "NAMA LENGKAP" atau "NAMA" tidak ditemukan dalam file Excel');
-    return result;
-  }
-
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const nama = String(row[colNama] || '').trim();
-    if (!nama) { result.skipped++; continue; }
-
-    const nis = colNIS !== -1 ? String(row[colNIS] || '').trim() : '';
-    const namaPanggilan = colNamaPanggilan !== -1 ? String(row[colNamaPanggilan] || '').trim() : '';
-    const jk = colJK !== -1 ? String(row[colJK] || '').trim() : '';
-    const nik = colNIK !== -1 ? String(row[colNIK] || '').trim() : '';
-    const hp = colHP !== -1 ? String(row[colHP] || '').trim() : '';
-    const alamat = colAlamat !== -1 ? String(row[colAlamat] || '').trim() : '';
-    const namaWali = colNamaWali !== -1 ? String(row[colNamaWali] || '').trim() : '';
-    const noWali = colNoWali !== -1 ? String(row[colNoWali] || '').trim() : '';
-
-    // Normalisasi jenis kelamin
-    let jkNormal = jk;
-    const jkLower = jk.toLowerCase();
-    if (jkLower === 'l' || jkLower === 'laki' || jkLower === 'laki-laki' || jkLower === 'male') {
-      jkNormal = 'Laki-laki';
-    } else if (jkLower === 'p' || jkLower === 'perempuan' || jkLower === 'wanita' || jkLower === 'female') {
-      jkNormal = 'Perempuan';
-    }
-
-    try {
-      // Cek duplikasi berdasarkan NIS (jika ada) atau nama
-      let existing: RowDataPacket[] = [];
-      if (nis) {
-        [existing] = await pool.execute<RowDataPacket[]>(
-          'SELECT murid_id FROM murid WHERE nis = ? LIMIT 1', [nis]
-        );
-      }
-      if (existing.length === 0) {
-        [existing] = await pool.execute<RowDataPacket[]>(
-          'SELECT murid_id FROM murid WHERE nama = ? LIMIT 1', [nama]
-        );
-      }
-
-      if (existing.length > 0) {
-        // Update data yang sudah ada
-        await pool.execute(
-          `UPDATE murid SET nama = ?, nis = ?, nama_panggilan = ?, jenis_kelamin = ?, nik = ?, no_hp = ?, alamat = ?, nama_wali = ?, no_wali = ? WHERE murid_id = ?`,
-          [
-            nama,
-            nis || null,
-            namaPanggilan || null,
-            jkNormal || null,
-            nik || null,
-            hp || null,
-            alamat || null,
-            namaWali || null,
-            noWali || null,
-            existing[0].murid_id
-          ]
-        );
-        result.updated++;
-      } else {
-        // Insert baru
-        await pool.execute(
-          `INSERT INTO murid (nama, nis, nama_panggilan, jenis_kelamin, nik, no_hp, alamat, nama_wali, no_wali) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            nama,
-            nis || null,
-            namaPanggilan || null,
-            jkNormal || null,
-            nik || null,
-            hp || null,
-            alamat || null,
-            namaWali || null,
-            noWali || null
-          ]
-        );
-        result.inserted++;
-      }
-    } catch (err: any) {
-      result.errors.push(`Baris ${i + 2}: ${err.message}`);
-    }
-  }
-
-  return result;
 }
 
 // ─── IMPORT GURU ────────────────────────────────────────────────────────────
@@ -307,6 +160,7 @@ async function importGuru(rows: any[][], headers: string[]) {
     const alamat = colAlamat !== -1 ? String(row[colAlamat] || '').trim() : '';
 
     try {
+      // Cek duplikasi berdasarkan NIP (jika ada) atau nama
       let existing: RowDataPacket[] = [];
       if (nip) {
         [existing] = await pool.execute<RowDataPacket[]>(
@@ -320,12 +174,14 @@ async function importGuru(rows: any[][], headers: string[]) {
       }
 
       if (existing.length > 0) {
+        // Update data yang sudah ada
         await pool.execute(
           `UPDATE guru SET nama = ?, nip = ?, jenis_kelamin = ?, jabatan = ?, no_hp = ?, alamat = ? WHERE guru_id = ?`,
           [nama, nip || null, jk || null, jabatan || null, hp || null, alamat || null, existing[0].guru_id]
         );
         result.updated++;
       } else {
+        // Insert baru
         await pool.execute(
           `INSERT INTO guru (nama, nip, jenis_kelamin, jabatan, no_hp, alamat) VALUES (?, ?, ?, ?, ?, ?)`,
           [nama, nip || null, jk || null, jabatan || null, hp || null, alamat || null]
@@ -445,11 +301,13 @@ async function importJadwal(rows: any[][], headers: string[], tipe: 'madin' | 'q
     if (!kegiatan) { result.skipped++; continue; }
 
     try {
+      // Resolve tempat_id
       let tempatId: number | null = null;
       if (tempatNama) {
         tempatId = await resolveTempatId(tipe, tempatNama);
       }
 
+      // Resolve guru_id
       let guruId: number | null = null;
       if (guruNama) {
         const [guruRows] = await pool.execute<RowDataPacket[]>(
@@ -458,6 +316,7 @@ async function importJadwal(rows: any[][], headers: string[], tipe: 'madin' | 'q
         if (guruRows.length > 0) guruId = guruRows[0].guru_id;
       }
 
+      // Cek duplikasi berdasarkan hari + jam + kegiatan + tempat
       let tableName = '', idCol = '', kegiatanCol = '', tempatCol = '';
       if (tipe === 'madin') {
         tableName = 'jadwal_madin'; idCol = 'jadwal_id'; kegiatanCol = 'mata_pelajaran'; tempatCol = 'kelas_madin_id';
@@ -473,12 +332,15 @@ async function importJadwal(rows: any[][], headers: string[], tipe: 'madin' | 'q
       );
 
       if (existing.length > 0) {
+        // Update existing
         const updates: string[] = [];
         const params: any[] = [];
+
         updates.push('jam_selesai = ?'); params.push(jamSelesai);
         if (guruId) { updates.push('guru_id = ?'); params.push(guruId); }
         if (tempatId) { updates.push(`${tempatCol} = ?`); params.push(tempatId); }
         params.push(existing[0].id);
+
         if (updates.length > 0) {
           await pool.execute(
             `UPDATE ${tableName} SET ${updates.join(', ')} WHERE ${idCol} = ?`, params
@@ -486,6 +348,7 @@ async function importJadwal(rows: any[][], headers: string[], tipe: 'madin' | 'q
         }
         result.updated++;
       } else {
+        // Insert baru
         await pool.execute(
           `INSERT INTO ${tableName} (hari, jam_mulai, jam_selesai, ${kegiatanCol}, ${tempatCol}, guru_id) VALUES (?, ?, ?, ?, ?, ?)`,
           [hari, jamMulai, jamSelesai, kegiatan, tempatId, guruId]
@@ -498,6 +361,55 @@ async function importJadwal(rows: any[][], headers: string[], tipe: 'madin' | 'q
   }
 
   return result;
+}
+
+// ─── HELPER FUNCTIONS ───────────────────────────────────────────────────────
+
+function findCol(headers: string[], aliases: string[]): number {
+  for (const alias of aliases) {
+    const idx = headers.indexOf(alias);
+    if (idx !== -1) return idx;
+  }
+  // Partial match
+  for (const alias of aliases) {
+    const idx = headers.findIndex(h => h.includes(alias));
+    if (idx !== -1) return idx;
+  }
+  return -1;
+}
+
+function formatTime(value: any): string {
+  if (value === null || value === undefined) return '00:00';
+  const str = String(value).trim();
+  // Jika format Excel number (fraction of day, e.g. 0.3333 = 08:00)
+  if (!isNaN(Number(str)) && Number(str) < 1 && Number(str) > 0) {
+    const totalMinutes = Math.round(Number(str) * 24 * 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  }
+  // Jika sudah format HH:MM atau HH:MM:SS
+  const match = str.match(/^(\d{1,2}):(\d{2})/);
+  if (match) return `${match[1].padStart(2, '0')}:${match[2]}`;
+  return str;
+}
+
+async function resolveTempatId(tipe: string, nama: string): Promise<number | null> {
+  let rows: RowDataPacket[] = [];
+  if (tipe === 'madin') {
+    [rows] = await pool.execute<RowDataPacket[]>(
+      'SELECT kelas_id as id FROM kelas_madin WHERE nama_kelas LIKE ? LIMIT 1', [`%${nama}%`]
+    );
+  } else if (tipe === 'quran') {
+    [rows] = await pool.execute<RowDataPacket[]>(
+      'SELECT id FROM kelas_quran WHERE nama_kelas LIKE ? LIMIT 1', [`%${nama}%`]
+    );
+  } else if (tipe === 'kegiatan' || tipe === 'kamar') {
+    [rows] = await pool.execute<RowDataPacket[]>(
+      'SELECT kamar_id as id FROM kamar WHERE nama_kamar LIKE ? LIMIT 1', [`%${nama}%`]
+    );
+  }
+  return rows.length > 0 ? rows[0].id : null;
 }
 
 // ─── IMPORT JURNAL ──────────────────────────────────────────────────────────
@@ -518,14 +430,16 @@ async function importJurnal(rows: any[][], headers: string[], tipe: 'madin' | 'q
     const row = rows[i];
     const tanggalRaw = row[colTanggal];
     let tanggal = '';
-
+    
+    // Handle excel date formatting if numeric
     if (tanggalRaw && !isNaN(Number(tanggalRaw)) && Number(tanggalRaw) > 20000) {
+      // Excel serial date to YYYY-MM-DD
       const date = new Date(Math.round((Number(tanggalRaw) - 25569) * 86400 * 1000));
       tanggal = date.toISOString().split('T')[0];
     } else {
       tanggal = String(tanggalRaw || '').trim();
     }
-
+    
     const kelasKamarNama = String(row[colKelasKamar] || '').trim();
     const materi = String(row[colMateri] || '').trim();
     if (!tanggal || !kelasKamarNama || !materi) { result.skipped++; continue; }
@@ -564,6 +478,43 @@ async function importJurnal(rows: any[][], headers: string[], tipe: 'madin' | 'q
   return result;
 }
 
+// ─── IMPORT JADWAL ALUMNI ───────────────────────────────────────────────────
+async function importJadwalAlumni(rows: any[][], headers: string[]) {
+  const result = { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] };
+  const colJamMulai = findCol(headers, ['JAM MULAI', 'MULAI']);
+  const colJamSelesai = findCol(headers, ['JAM SELESAI', 'SELESAI']);
+  const colKegiatan = findCol(headers, ['KEGIATAN']);
+  const colTempat = findCol(headers, ['TEMPAT']);
+  const colKeterangan = findCol(headers, ['KETERANGAN']);
+
+  if (colJamMulai === -1 || colKegiatan === -1) {
+    result.errors.push('Kolom wajib (JAM MULAI, KEGIATAN) tidak ditemukan');
+    return result;
+  }
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const jamMulai = formatTime(row[colJamMulai]);
+    const kegiatan = String(row[colKegiatan] || '').trim();
+    if (!jamMulai || !kegiatan) { result.skipped++; continue; }
+
+    const jamSelesai = colJamSelesai !== -1 ? formatTime(row[colJamSelesai]) : '00:00';
+    const tempat = colTempat !== -1 ? String(row[colTempat] || '').trim() : '';
+    const keterangan = colKeterangan !== -1 ? String(row[colKeterangan] || '').trim() : '';
+
+    try {
+      await pool.execute(
+        `INSERT INTO jadwal_alumni (jam_mulai, jam_selesai, kegiatan, tempat, keterangan) VALUES (?, ?, ?, ?, ?)`,
+        [jamMulai, jamSelesai, kegiatan, tempat || null, keterangan || null]
+      );
+      result.inserted++;
+    } catch (err: any) {
+      result.errors.push(`Baris ${i + 2}: ${err.message}`);
+    }
+  }
+  return result;
+}
+
 // ─── IMPORT KETERTIBAN ──────────────────────────────────────────────────────
 async function importKetertiban(rows: any[][], headers: string[]) {
   const result = { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] };
@@ -580,7 +531,7 @@ async function importKetertiban(rows: any[][], headers: string[]) {
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const nis = String(row[colNIS] || '').trim();
-
+    
     const tanggalRaw = row[colTanggal];
     let tanggal = '';
     if (tanggalRaw && !isNaN(Number(tanggalRaw)) && Number(tanggalRaw) > 20000) {
@@ -589,7 +540,7 @@ async function importKetertiban(rows: any[][], headers: string[]) {
     } else {
       tanggal = String(tanggalRaw || '').trim();
     }
-
+    
     const jenis = String(row[colJenis] || '').trim();
     if (!nis || !tanggal || !jenis) { result.skipped++; continue; }
 
@@ -652,10 +603,16 @@ async function importKelas(rows: any[][], headers: string[], defaultType?: 'qura
           'SELECT kelas_id FROM kelas_madin WHERE nama_kelas = ? LIMIT 1', [namaKelas]
         );
         if (existing.length > 0) {
-          await pool.execute('UPDATE kelas_madin SET guru_id = ? WHERE kelas_id = ?', [guruId, existing[0].kelas_id]);
+          await pool.execute(
+            'UPDATE kelas_madin SET guru_id = ? WHERE kelas_id = ?',
+            [guruId, existing[0].kelas_id]
+          );
           result.updated++;
         } else {
-          await pool.execute('INSERT INTO kelas_madin (nama_kelas, guru_id) VALUES (?, ?)', [namaKelas, guruId]);
+          await pool.execute(
+            'INSERT INTO kelas_madin (nama_kelas, guru_id) VALUES (?, ?)',
+            [namaKelas, guruId]
+          );
           result.inserted++;
         }
       } else if (tipe === 'quran') {
@@ -663,10 +620,16 @@ async function importKelas(rows: any[][], headers: string[], defaultType?: 'qura
           'SELECT id FROM kelas_quran WHERE nama_kelas = ? LIMIT 1', [namaKelas]
         );
         if (existing.length > 0) {
-          await pool.execute('UPDATE kelas_quran SET guru_id = ? WHERE id = ?', [guruId, existing[0].id]);
+          await pool.execute(
+            'UPDATE kelas_quran SET guru_id = ? WHERE id = ?',
+            [guruId, existing[0].id]
+          );
           result.updated++;
         } else {
-          await pool.execute('INSERT INTO kelas_quran (nama_kelas, guru_id) VALUES (?, ?)', [namaKelas, guruId]);
+          await pool.execute(
+            'INSERT INTO kelas_quran (nama_kelas, guru_id) VALUES (?, ?)',
+            [namaKelas, guruId]
+          );
           result.inserted++;
         }
       } else {
@@ -712,10 +675,16 @@ async function importKamar(rows: any[][], headers: string[]) {
       );
 
       if (existing.length > 0) {
-        await pool.execute('UPDATE kamar SET guru_id = ? WHERE kamar_id = ?', [guruId, existing[0].kamar_id]);
+        await pool.execute(
+          'UPDATE kamar SET guru_id = ? WHERE kamar_id = ?',
+          [guruId, existing[0].kamar_id]
+        );
         result.updated++;
       } else {
-        await pool.execute('INSERT INTO kamar (nama_kamar, guru_id) VALUES (?, ?)', [namaKamar, guruId]);
+        await pool.execute(
+          'INSERT INTO kamar (nama_kamar, guru_id) VALUES (?, ?)',
+          [namaKamar, guruId]
+        );
         result.inserted++;
       }
     } catch (err: any) {
@@ -759,7 +728,10 @@ async function importUsers(rows: any[][], headers: string[]) {
       );
 
       if (existing.length > 0) {
-        await pool.execute('UPDATE users SET password = ?, role = ? WHERE id = ?', [hashedPassword, roleVal, existing[0].id]);
+        await pool.execute(
+          'UPDATE users SET password = ?, role = ? WHERE id = ?',
+          [hashedPassword, roleVal, existing[0].id]
+        );
         result.updated++;
       } else {
         const [userRes] = await pool.execute<ResultSetHeader>(
@@ -770,9 +742,15 @@ async function importUsers(rows: any[][], headers: string[]) {
 
         if (nipNis) {
           if (roleVal === 'guru') {
-            await pool.execute('UPDATE guru SET user_id = ? WHERE nip = ? OR nama = ?', [newUserId, nipNis, nama]);
+            await pool.execute(
+              'UPDATE guru SET user_id = ? WHERE nip = ? OR nama = ?',
+              [newUserId, nipNis, nama]
+            );
           } else if (roleVal === 'wali_murid') {
-            await pool.execute('UPDATE murid SET user_id = ? WHERE nis = ? OR nama = ?', [newUserId, nipNis, nama]);
+            await pool.execute(
+              'UPDATE murid SET user_id = ? WHERE nis = ? OR nama = ?',
+              [newUserId, nipNis, nama]
+            );
           }
         }
         result.inserted++;
@@ -784,43 +762,191 @@ async function importUsers(rows: any[][], headers: string[]) {
   return result;
 }
 
-// ─── IMPORT KURIKULUM ───────────────────────────────────────────────────────
+// ─── IMPORT BILLING (Excel Billing) ──────────────────────────────────────────
+async function importBilling(workbook: XLSX.WorkBook) {
+  const result = { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] };
+
+  for (const sheetName of workbook.SheetNames) {
+    const cleanSheetName = sheetName.trim().toUpperCase();
+    let kategori: 'pesantren' | 'madrasah' = 'pesantren';
+
+    if (/^(ASRAMA\s+)?[A-F]$/i.test(cleanSheetName)) {
+      // Sheet huruf tunggal A-F atau "ASRAMA A" dst. = tagihan pesantren
+      kategori = 'pesantren';
+    } else if (/KELAS\s*\d|^(IX|XII|XI|X)\s|MTS-|SMP-|MA-|SMK-|^\d+\s*(MTS|SMP|MA|SMK)/i.test(cleanSheetName)) {
+      // Sheet seperti "KELAS 9 MTS", "XII MA", "XII SMK", "KELAS 9 SMP" = tagihan madrasah
+      kategori = 'madrasah';
+    } else {
+      // Lewati sheet yang tidak relevan (seperti TEXTVALUE, Template WA, TOP 10, import1/2/3, Sheet1, Setting, dll.)
+      continue;
+    }
+
+    const sheet = workbook.Sheets[sheetName];
+    const rawData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+    if (rawData.length < 2) continue;
+
+    let headerRowIndex = -1;
+    let colNIS = -1;
+    let colNama = -1;
+    let colAsrama = -1;
+    let colKamar = -1;
+    let colSyahriyah = -1;
+    let colJariyah = -1;
+    let colDaftarUlang = -1;
+    let colTotal = -1;
+
+    for (let i = 0; i < Math.min(rawData.length, 15); i++) {
+      const row = rawData[i];
+      if (!row) continue;
+      
+      const rowHeaders = row.map((h: any) => String(h || '').toUpperCase().trim());
+      
+      const idxNIS = rowHeaders.indexOf('NIS');
+      const idxNama = findCol(rowHeaders, ['NAMA', 'NAMA LENGKAP', 'NAMA SANTRI']);
+      
+      if (idxNIS !== -1 && idxNama !== -1) {
+        headerRowIndex = i;
+        colNIS = idxNIS;
+        colNama = idxNama;
+        colAsrama = findCol(rowHeaders, ['ASRAMA']);
+        colKamar = findCol(rowHeaders, ['KAMAR']);
+        colSyahriyah = findCol(rowHeaders, ['JUMLAH SYAHRIYAH', 'SYAHRIYAH', 'SPP']);
+        colJariyah = findCol(rowHeaders, ['JUMLAH JARIYAH', 'JARIYAH', 'JARIYAH I']);
+        colDaftarUlang = findCol(rowHeaders, ['JUMLAH DAFTAR ULANG', 'DAFTAR ULANG', 'DANA KEGIATAN']);
+        colTotal = findCol(rowHeaders, ['JUMLAH TOTAL TUNGGAKAN', 'TOTAL TUNGGAKAN', 'TOTAL', 'JUMLAH TOTAL']);
+        break;
+      }
+    }
+
+    if (headerRowIndex === -1) {
+      continue;
+    }
+
+    // Resolve colStatus sekali per sheet (untuk file REKAP KELAS III)
+    const headerRowHeaders = rawData[headerRowIndex].map((h: any) => String(h || '').toUpperCase().trim());
+    const colStatus = findCol(headerRowHeaders, ['STATUS ADMINISTRASI', 'STATUS']);
+
+    const dataRows = rawData.slice(headerRowIndex + 1).filter((row: any[]) => {
+      return row && row.some(cell => cell !== null && cell !== undefined && cell !== '');
+    });
+
+    for (let i = 0; i < dataRows.length; i++) {
+      const row = dataRows[i];
+      const nisRaw = row[colNIS];
+      const nama = String(row[colNama] || '').trim();
+      
+      if (!nisRaw || !nama || ['NAMA', 'NAMA LENGKAP', 'NAMA SANTRI'].includes(nama.toUpperCase())) {
+        result.skipped++;
+        continue;
+      }
+
+      const nis = String(nisRaw).trim();
+
+      let asrama = colAsrama !== -1 ? String(row[colAsrama] || '').trim() : '';
+      if (!asrama || asrama === '0') {
+        asrama = sheetName.trim();
+      }
+      
+      if (asrama.length === 1 && /^[A-F]$/i.test(asrama)) {
+        asrama = `Asrama ${asrama.toUpperCase()}`;
+      }
+
+      const kamar = colKamar !== -1 ? String(row[colKamar] || '').trim() : '';
+
+      const syahriyah = colSyahriyah !== -1 ? Number(row[colSyahriyah] || 0) : 0;
+      const jariyah = colJariyah !== -1 ? Number(row[colJariyah] || 0) : 0;
+      const daftarUlang = colDaftarUlang !== -1 ? Number(row[colDaftarUlang] || 0) : 0;
+      const totalTunggakan = colTotal !== -1 ? Number(row[colTotal] || 0) : (syahriyah + jariyah + daftarUlang);
+
+      // Jika STATUS ADMINISTRASI = "Lunas" dan semua nominal 0, tetap import sebagai lunas
+      const statusAdm = colStatus !== -1 ? String(row[colStatus] || '').trim() : '';
+      const isLunasFromSheet = /lunas/i.test(statusAdm) && !/belum/i.test(statusAdm);
+
+      if (totalTunggakan <= 0 && syahriyah <= 0 && jariyah <= 0 && daftarUlang <= 0 && !isLunasFromSheet) {
+        result.skipped++;
+        continue;
+      }
+
+      const billings = [
+        { name: 'Syahriyah', amount: syahriyah },
+        { name: 'Jariyah', amount: jariyah },
+        { name: 'Daftar Ulang', amount: daftarUlang }
+      ];
+
+      try {
+        for (const bill of billings) {
+          if (bill.amount > 0) {
+            const status = isLunasFromSheet ? 'Lunas' : 'Belum';
+            const periode = '2026-2027';
+
+            await pool.execute(
+              `INSERT INTO billing (nis, nama_santri, asrama, kamar, nama_tagihan, nominal, status, periode, source, kategori)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'excel', ?)
+               ON DUPLICATE KEY UPDATE
+                 nama_santri = VALUES(nama_santri),
+                 asrama = VALUES(asrama),
+                 kamar = VALUES(kamar),
+                 nominal = VALUES(nominal),
+                 status = VALUES(status),
+                 source = 'excel'`,
+              [nis, nama, asrama, kamar || '-', bill.name, bill.amount, status, periode, kategori]
+            );
+          } else if (!isLunasFromSheet) {
+            await pool.execute(
+              `DELETE FROM billing WHERE nis = ? AND nama_tagihan = ? AND periode = ? AND status = 'Belum' AND kategori = ?`,
+              [nis, bill.name, '2026-2027', kategori]
+            );
+          }
+        }
+        result.inserted++;
+      } catch (err: any) {
+        result.errors.push(`Sheet ${sheetName}, Baris ${i + 2}: ${err.message}`);
+      }
+    }
+  }
+
+  return result;
+}
+
+// ─── IMPORT KURIKULUM ───────────────────────────────────────────────────────────
 async function importKurikulum(rows: any[][], headers: string[]) {
   const result = { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] };
-  const colTingkatan = findCol(headers, ['TINGKATAN', 'LEVEL', 'JENJANG']);
-  const colMapel = findCol(headers, ['MATA PELAJARAN', 'MAPEL', 'PELAJARAN']);
-  const colKitab = findCol(headers, ['JENJANG KITAB', 'KITAB']);
+  const colTingkat = findCol(headers, ['TINGKATAN', 'TINGKAT', 'LEVEL']);
+  const colMapel = findCol(headers, ['MATA PELAJARAN', 'MAPEL']);
+  const colKitab = findCol(headers, ['JENJANG KITAB', 'KITAB', 'BUKU']);
   const colKeterangan = findCol(headers, ['KETERANGAN', 'CATATAN']);
 
-  if (colTingkatan === -1 || colMapel === -1) {
-    result.errors.push('Kolom wajib (TINGKATAN, MATA PELAJARAN) tidak ditemukan');
+  if (colTingkat === -1 || colMapel === -1 || colKitab === -1) {
+    result.errors.push('Kolom wajib (TINGKATAN, MATA PELAJARAN, JENJANG KITAB) tidak ditemukan');
     return result;
   }
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const tingkatan = String(row[colTingkatan] || '').trim();
+    const tingkat = String(row[colTingkat] || '').trim().toUpperCase();
     const mapel = String(row[colMapel] || '').trim();
-    if (!tingkatan || !mapel) { result.skipped++; continue; }
-
-    const kitab = colKitab !== -1 ? String(row[colKitab] || '').trim() : '';
+    const kitab = String(row[colKitab] || '').trim();
     const keterangan = colKeterangan !== -1 ? String(row[colKeterangan] || '').trim() : '';
+
+    if (!tingkat || !mapel || !kitab) { result.skipped++; continue; }
 
     try {
       const [existing] = await pool.execute<RowDataPacket[]>(
-        'SELECT id FROM kurikulum WHERE tingkatan = ? AND mata_pelajaran = ? LIMIT 1', [tingkatan, mapel]
+        'SELECT id FROM kurikulum_madin WHERE tingkat = ? AND mata_pelajaran = ? LIMIT 1',
+        [tingkat, mapel]
       );
 
       if (existing.length > 0) {
         await pool.execute(
-          'UPDATE kurikulum SET jenjang_kitab = ?, keterangan = ? WHERE id = ?',
-          [kitab || null, keterangan || null, existing[0].id]
+          'UPDATE kurikulum_madin SET kitab = ?, keterangan = ? WHERE id = ?',
+          [kitab, keterangan || null, existing[0].id]
         );
         result.updated++;
       } else {
         await pool.execute(
-          'INSERT INTO kurikulum (tingkatan, mata_pelajaran, jenjang_kitab, keterangan) VALUES (?, ?, ?, ?)',
-          [tingkatan, mapel, kitab || null, keterangan || null]
+          'INSERT INTO kurikulum_madin (tingkat, mata_pelajaran, kitab, keterangan) VALUES (?, ?, ?, ?)',
+          [tingkat, mapel, kitab, keterangan || null]
         );
         result.inserted++;
       }
@@ -830,3 +956,113 @@ async function importKurikulum(rows: any[][], headers: string[]) {
   }
   return result;
 }
+
+// ─── IMPORT MURID ──────────────────────────────────────────────────────────────
+async function importMurid(rows: any[][], headers: string[]) {
+  const result = { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] };
+
+  const colNIS = findCol(headers, ['NIS', 'NOMOR INDUK']);
+  const colNama = findCol(headers, ['NAMA LENGKAP', 'NAMA']);
+  const colNamaPanggilan = findCol(headers, ['NAMA PANGGILAN', 'PANGGILAN']);
+  const colJK = findCol(headers, ['JENIS KELAMIN', 'J. KELAMIN', 'JK', 'GENDER']);
+  const colNIK = findCol(headers, ['NIK', 'NOMOR INDUK KEPENDUDUKAN']);
+  const colHP = findCol(headers, ['NO HP', 'NO. HP', 'WHATSAPP', 'TELEPON']);
+  const colAlamat = findCol(headers, ['ALAMAT']);
+  const colNamaWali = findCol(headers, ['NAMA WALI', 'WALI']);
+  const colNoWali = findCol(headers, ['NO HP WALI', 'HP WALI', 'TELEPON WALI']);
+
+  if (colNama === -1) {
+    result.errors.push('Kolom "NAMA LENGKAP" atau "NAMA" tidak ditemukan');
+    return result;
+  }
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const nama = String(row[colNama] || '').trim();
+    if (!nama) { result.skipped++; continue; }
+
+    const nis = colNIS !== -1 ? String(row[colNIS] || '').trim() : '';
+    const namaPanggilan = colNamaPanggilan !== -1 ? String(row[colNamaPanggilan] || '').trim() : '';
+    const jk = colJK !== -1 ? String(row[colJK] || '').trim() : '';
+    const nik = colNIK !== -1 ? String(row[colNIK] || '').trim() : '';
+    const hp = colHP !== -1 ? String(row[colHP] || '').trim() : '';
+    const alamat = colAlamat !== -1 ? String(row[colAlamat] || '').trim() : '';
+    const namaWali = colNamaWali !== -1 ? String(row[colNamaWali] || '').trim() : '';
+    const noWali = colNoWali !== -1 ? String(row[colNoWali] || '').trim() : '';
+
+    // Standardize gender/jenis kelamin
+    let gender = jk;
+    if (jk.toUpperCase() === 'L' || jk.toUpperCase().startsWith('LAKI')) {
+      gender = 'Laki-laki';
+    } else if (jk.toUpperCase() === 'P' || jk.toUpperCase().startsWith('PEREMPUAN')) {
+      gender = 'Perempuan';
+    }
+
+    try {
+      let existing: RowDataPacket[] = [];
+      if (nis) {
+        [existing] = await pool.execute<RowDataPacket[]>(
+          'SELECT murid_id FROM murid WHERE nis = ? LIMIT 1', [nis]
+        );
+      }
+      if (existing.length === 0) {
+        [existing] = await pool.execute<RowDataPacket[]>(
+          'SELECT murid_id FROM murid WHERE nama = ? LIMIT 1', [nama]
+        );
+      }
+
+      if (existing.length > 0) {
+        // Update
+        await pool.execute(
+          `UPDATE murid SET 
+            nama = ?, 
+            nama_panggilan = ?, 
+            jenis_kelamin = ?, 
+            nik = ?, 
+            no_hp = ?, 
+            alamat = ?, 
+            nama_wali = ?, 
+            no_wali = ?,
+            nis = ?
+           WHERE murid_id = ?`,
+          [
+            nama, 
+            namaPanggilan || null, 
+            gender || null, 
+            nik || null, 
+            hp || null, 
+            alamat || null, 
+            namaWali || null, 
+            noWali || null,
+            nis || null,
+            existing[0].murid_id
+          ]
+        );
+        result.updated++;
+      } else {
+        // Insert
+        await pool.execute(
+          `INSERT INTO murid (nis, nama, nama_panggilan, jenis_kelamin, nik, no_hp, alamat, nama_wali, no_wali, barcode_id) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            nis || null, 
+            nama, 
+            namaPanggilan || null, 
+            gender || null, 
+            nik || null, 
+            hp || null, 
+            alamat || null, 
+            namaWali || null, 
+            noWali || null,
+            nis || null // use nis as barcode_id by default for new pupils
+          ]
+        );
+        result.inserted++;
+      }
+    } catch (err: any) {
+      result.errors.push(`Baris ${i + 2}: ${err.message}`);
+    }
+  }
+  return result;
+}
+

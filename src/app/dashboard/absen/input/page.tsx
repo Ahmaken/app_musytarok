@@ -303,8 +303,8 @@ function InputAbsenContent() {
     // Foto akan otomatis dilampirkan oleh native share (jika didukung) atau dilewati.
 
 
-    msg += `\n🔗 *Lihat Detail Absensi:* https://app.pptq.ppmawar.or.id/dashboard/absen\n`;
-    msg += `\n_Diinput melalui Sistem Absensi Online PPTQ_\n_https://app.pptq.ppmawar.or.id_`;
+    msg += `\n🔗 *Lihat Detail Absensi:* https://absensi.ppmawar.or.id/dashboard/absen\n`;
+    msg += `\n_Diinput melalui Sistem Absensi Online PPMA_\n_https://absensi.ppmawar.or.id_`;
     return msg;
   };
 

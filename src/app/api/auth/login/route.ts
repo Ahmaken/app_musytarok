@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       const response = NextResponse.json({ success: true, message: 'Masuk sebagai tamu', user: payload });
       response.cookies.set('token', token, {
         httpOnly: true,
-        secure: false,
+        secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
         maxAge: 60 * 60 * 2 // 2 jam untuk tamu
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
     // Set HTTP-Only Cookie
     response.cookies.set('token', token, {
       httpOnly: true,
-      secure: false,
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 // 1 hari

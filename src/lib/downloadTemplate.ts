@@ -1,16 +1,11 @@
 import * as XLSX from 'xlsx';
 
-export const downloadTemplate = (type: 'murid' | 'guru' | 'alumni' | 'jadwal_madin' | 'jadwal_quran' | 'jadwal_kegiatan' | 'jurnal_madin' | 'jurnal_quran' | 'jurnal_kamar' | 'ketertiban' | 'kelas' | 'kamar' | 'users' | 'kurikulum') => {
+export const downloadTemplate = (type: 'guru' | 'alumni' | 'jadwal_madin' | 'jadwal_quran' | 'jadwal_kegiatan' | 'jurnal_madin' | 'jurnal_quran' | 'jurnal_kamar' | 'jadwal_alumni' | 'ketertiban' | 'kelas' | 'kamar' | 'users' | 'kurikulum' | 'murid') => {
   let headers: string[] = [];
   let exampleRow: string[] = [];
   let filename = '';
 
   switch (type) {
-    case 'murid':
-      headers = ['NIS', 'NAMA LENGKAP', 'NAMA PANGGILAN', 'JENIS KELAMIN', 'NIK', 'NO HP', 'ALAMAT', 'NAMA WALI', 'NO HP WALI'];
-      exampleRow = ['202301001', 'Ahmad Zaki Mubarak', 'Zaki', 'Laki-laki', '3524012345678901', '085712345678', 'Babat, Lamongan', 'Budi Santoso', '081234567890'];
-      filename = 'Templat_Impor_Murid.xlsx';
-      break;
     case 'guru':
       headers = ['NIP', 'NAMA LENGKAP', 'JENIS KELAMIN', 'JABATAN', 'NO HP', 'ALAMAT'];
       exampleRow = ['198203042009121002', 'Ahmad Fauzi, M.Pd.', 'L', 'Ustadz Madin', '081234567890', 'Babat, Lamongan'];
@@ -56,6 +51,11 @@ export const downloadTemplate = (type: 'murid' | 'guru' | 'alumni' | 'jadwal_mad
       exampleRow = ['2026-07-03', 'A1', 'Kajian Kitab Al-Hikam', 'Selesai bab 1', 'Suara kurang keras'];
       filename = 'Templat_Impor_Jurnal_Kamar.xlsx';
       break;
+    case 'jadwal_alumni':
+      headers = ['JAM MULAI', 'JAM SELESAI', 'KEGIATAN', 'TEMPAT', 'KETERANGAN'];
+      exampleRow = ['08:00', '10:00', 'Khotmil Quran', 'Masjid Utama', 'Sifatnya wajib'];
+      filename = 'Templat_Impor_Jadwal_Alumni.xlsx';
+      break;
     case 'ketertiban':
       headers = ['NIS', 'NAMA SANTRI', 'JENIS KELAMIN', 'TANGGAL (YYYY-MM-DD)', 'JENIS PELANGGARAN', 'DESKRIPSI'];
       exampleRow = ['202301004', 'Muhammad Zidan', 'Laki-laki', '2026-07-03', 'Keterlambatan', 'Terlambat berjamaah subuh'];
@@ -73,13 +73,18 @@ export const downloadTemplate = (type: 'murid' | 'guru' | 'alumni' | 'jadwal_mad
       break;
     case 'users':
       headers = ['USERNAME', 'NAMA', 'ROLE (admin/staff/guru/pengurus_asrama/wali_murid)', 'PASSWORD', 'NIP / NIS'];
-      exampleRow = ['zidan123', 'Muhammad Zidan', 'wali_murid', 'Pesantren123', '202301004'];
+      exampleRow = ['zidan123', 'Muhammad Zidan', 'wali_murid', 'Mawar123', '202301004'];
       filename = 'Templat_Impor_Users.xlsx';
+      break;
+    case 'murid':
+      headers = ['NIS', 'NAMA LENGKAP', 'NAMA PANGGILAN', 'JENIS KELAMIN', 'NIK', 'NO HP', 'ALAMAT', 'NAMA WALI', 'NO HP WALI'];
+      exampleRow = ['202601001', 'Muhammad Rizky', 'Rizky', 'Laki-laki', '3524010203040001', '081234567890', 'Babat, Lamongan', 'Sugeng', '081234567891'];
+      filename = 'Templat_Impor_Murid.xlsx';
       break;
   }
 
   const ws = XLSX.utils.aoa_to_sheet([headers, exampleRow]);
-
+  
   // Auto column widths
   const colWidths = headers.map((h, i) => {
     const valLength = Math.max(h.length, String(exampleRow[i] || '').length);

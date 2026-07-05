@@ -46,19 +46,27 @@ export async function GET(request: Request) {
       } else {
         whereClause = `WHERE 0=1`;
       }
-    } else if (role === 'pengurus_asrama') {
+    } else if (role === 'pengurus_asrama' || role === 'pengasuh') {
       if (namaAsrama) {
         if (actualType === 'madin') {
-          whereClause = `WHERE k.kelas_id IN (SELECT DISTINCT m.kelas_madin_id FROM murid m JOIN kamar km ON m.kamar_id = km.kamar_id WHERE km.nama_asrama = ? AND m.kelas_madin_id IS NOT NULL)`;
-          params = [namaAsrama];
+          if (role === 'pengasuh') {
+            whereClause = `WHERE 0=1`;
+          } else {
+            whereClause = `WHERE k.kelas_id IN (SELECT DISTINCT m.kelas_madin_id FROM murid m JOIN kamar km ON m.kamar_id = km.kamar_id WHERE km.nama_asrama = ? AND m.kelas_madin_id IS NOT NULL)`;
+            params = [namaAsrama];
+          }
         } else if (actualType === 'quran') {
-          // Pengurus asrama hanya dapat melihat kelas quran yang ada santri dari asramanya ATAU nama_kelas mengandung nama asrama
-          whereClause = `WHERE k.id IN (
-            SELECT DISTINCT m.kelas_quran_id FROM murid m
-            JOIN kamar km ON m.kamar_id = km.kamar_id
-            WHERE km.nama_asrama = ? AND m.kelas_quran_id IS NOT NULL
-          ) OR k.nama_kelas LIKE ?`;
-          params = [namaAsrama, `%${namaAsrama}%`];
+          if (role === 'pengasuh') {
+            whereClause = `WHERE 0=1`;
+          } else {
+            // Pengurus asrama hanya dapat melihat kelas quran yang ada santri dari asramanya ATAU nama_kelas mengandung nama asrama
+            whereClause = `WHERE k.id IN (
+              SELECT DISTINCT m.kelas_quran_id FROM murid m
+              JOIN kamar km ON m.kamar_id = km.kamar_id
+              WHERE km.nama_asrama = ? AND m.kelas_quran_id IS NOT NULL
+            ) OR k.nama_kelas LIKE ?`;
+            params = [namaAsrama, `%${namaAsrama}%`];
+          }
         } else if (actualType === 'kamar') {
           whereClause = `WHERE k.nama_asrama = ?`;
           params = [namaAsrama];
@@ -148,3 +156,52 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: 'Server error: ' + error.message }, { status: 500 });
   }
 }
+
+export async function POST(request: Request) {
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    const payload = token ? verifyToken(token) : null;
+    if (!payload || ((payload as any).role !== 'admin' && (payload as any).role !== 'staff')) {
+      return NextResponse.json({ error: 'Hanya admin/staff yang dapat menambahkan' }, { status: 403 });
+    }
+
+    const data = await request.json();
+    const { nama, type } = data; // type: madin, quran, kamar
+    if (!nama || !type) return NextResponse.json({ error: 'Data tidak lengkap' }, { status: 400 });
+
+    if (type === 'madin') {
+      await pool.execute('INSERT INTO kelas_madin (nama_kelas) VALUES (?)', [nama]);
+    } else if (type === 'quran') {
+      await pool.execute('INSERT INTO kelas_quran (nama_kelas) VALUES (?)', [nama]);
+    } else if (type === 'kamar') {
+      let namaAsrama = null;
+      const cleanNama = nama.trim().toUpperCase();
+      if (cleanNama.startsWith('ASRAMA A') || cleanNama.startsWith('A ')) {
+        namaAsrama = 'A';
+      } else if (cleanNama.startsWith('ASRAMA B') || cleanNama.startsWith('B ')) {
+        namaAsrama = 'B';
+      } else if (cleanNama.startsWith('ASRAMA C') || cleanNama.startsWith('C ')) {
+        namaAsrama = 'C';
+      } else if (cleanNama.startsWith('ASRAMA D') || cleanNama.startsWith('D ')) {
+        namaAsrama = 'D';
+      } else if (cleanNama.startsWith('ASRAMA E') || cleanNama.startsWith('E ')) {
+        namaAsrama = 'E';
+      } else if (cleanNama.startsWith('ASRAMA F') || cleanNama.startsWith('F ')) {
+        namaAsrama = 'F';
+      } else {
+        // Fallback check single char
+        const firstChar = cleanNama.charAt(0);
+        if (['A', 'B', 'C', 'D', 'E', 'F'].includes(firstChar)) {
+          namaAsrama = firstChar;
+        }
+      }
+      await pool.execute('INSERT INTO kamar (nama_kamar, nama_asrama) VALUES (?, ?)', [nama, namaAsrama]);
+    }
+
+    return NextResponse.json({ success: true, message: 'Data berhasil ditambahkan' });
+  } catch (error: any) {
+    return NextResponse.json({ error: 'Server error: ' + error.message }, { status: 500 });
+  }
+}
+

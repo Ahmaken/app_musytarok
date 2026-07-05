@@ -74,7 +74,7 @@ export async function POST(request: Request) {
           ]
         );
 
-        await connection.execute('DELETE FROM users WHERE murid_id = ?', [murid.murid_id]);
+        await connection.execute('UPDATE users SET role = ?, murid_id = NULL WHERE murid_id = ?', ['alumni', murid.murid_id]);
         await connection.execute('DELETE FROM murid WHERE murid_id = ?', [murid.murid_id]);
         
         successCount++;
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Tidak ada data murid yang diproses' }, { status: 404 });
       }
 
-      return NextResponse.json({ success: true, message: `${successCount} Santri berhasil diluluskan, dipindah ke daftar Alumni, dan User terkait telah dihapus.` });
+      return NextResponse.json({ success: true, message: `${successCount} Santri berhasil diluluskan dan dipindah ke daftar Alumni. Akun User terkait telah dikonversi menjadi role Alumni.` });
     } catch (error: any) {
       await connection.rollback();
       connection.release();

@@ -84,6 +84,10 @@ export default function SettingsPage() {
     }
   };
 
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState('');
+  const [syncSuccess, setSyncSuccess] = useState('');
+  const [syncInfo, setSyncInfo] = useState<any>(null);
 
   // Google Sheets Sync
   const [gsheetSyncing, setGsheetSyncing] = useState(false);
@@ -257,6 +261,37 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSyncManual = async () => {
+    setSyncing(true);
+    setSyncError('');
+    setSyncSuccess('');
+    setSyncInfo(null);
+
+    try {
+      const res = await fetch('/api/sync/murid');
+      const json = await res.json();
+      if (json.success) {
+        setSyncSuccess('Sinkronisasi data santri berhasil dilakukan!');
+        setSyncInfo({
+          total: json.total_data_mitra || 0,
+          new_students: json.new_students || 0,
+          updated_students: json.updated_students || 0
+        });
+        
+        // Perbarui tanggal terakhir sinkronisasi di state local
+        setSettings(prev => ({
+          ...prev,
+          terakhir_sinkronisasi: new Date().toISOString()
+        }));
+      } else {
+        setSyncError(json.error || json.message || 'Gagal sinkronisasi data santri');
+      }
+    } catch (e) {
+      setSyncError('Kesalahan jaringan saat melakukan sinkronisasi');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   if (loading) return <div className="p-10 text-center animate-pulse text-gray-400 font-bold">Memuat Pengaturan...</div>;
 
@@ -475,6 +510,7 @@ export default function SettingsPage() {
           </div>
         </form>
       </div>
+
 
 
       {/* Card Google Sheets Sync */}

@@ -267,7 +267,7 @@ export default function LoginPage() {
 
         <div className="mt-6 text-center">
           <p className="text-xs text-green-200 font-mono" style={{ fontFamily: '"Courier New", Courier, monospace' }}>
-            &copy; {new Date().getFullYear()} PP. Tanwirul Qulub
+            &copy; {new Date().getFullYear()} PP. Matholi'ul Anwar
           </p>
         </div>
       </div>

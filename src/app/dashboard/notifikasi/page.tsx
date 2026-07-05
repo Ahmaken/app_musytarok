@@ -45,13 +45,13 @@ function NotifikasiContent() {
   const [showAllWaliData, setShowAllWaliData] = useState(false);
   const [showAllInfoGuru, setShowAllInfoGuru] = useState(false);
 
-  const defaultWaliTemplate = `Assalamu'alaikum Wr. Wb. Bapak/Ibu Wali dari Ananda *{nama_santri}*.\n\nKami dari pengurus PPTQ menginformasikan perkembangan kehadiran ananda hari ini:\n\n* Kegiatan: {kegiatan}\n* Tempat/Kelas: {kelas}\n* Status Absensi: *{status}*\n\nUntuk informasi kehadiran lebih lengkap, dapat dilihat melalui tautan berikut:\n{link_laporan}\n\nDemikian informasi yang dapat kami sampaikan. Atas perhatiannya kami ucapkan terima kasih.\n\nWassalamu'alaikum Wr. Wb.`;
+  const defaultWaliTemplate = `Assalamu'alaikum Wr. Wb. Bapak/Ibu Wali dari Ananda *{nama_santri}*.\n\nKami dari pengurus PPMA menginformasikan perkembangan kehadiran ananda hari ini:\n\n* Kegiatan: {kegiatan}\n* Tempat/Kelas: {kelas}\n* Status Absensi: *{status}*\n\nUntuk informasi kehadiran lebih lengkap, dapat dilihat melalui tautan berikut:\n{link_laporan}\n\nDemikian informasi yang dapat kami sampaikan. Atas perhatiannya kami ucapkan terima kasih.\n\nWassalamu'alaikum Wr. Wb.`;
 
-  const defaultWaliInfoTemplate = `Assalamu'alaikum Wr. Wb. Bapak/Ibu Wali dari Ananda *{nama_santri}*.\n\nBerikut kami sampaikan informasi login default untuk mengakses aplikasi absensi PPTQ:\n\n* Username: *{username}*\n* Password: *{password}*\n\nSilakan akses aplikasi pada tautan berikut: https://app.pptq.ppmawar.or.id/\n\nDemi keamanan akun, kami sarankan Bapak/Ibu untuk langsung mengubah password setelah berhasil login di halaman Profil.\n\nAtas perhatiannya kami ucapkan terima kasih.\n\nWassalamu'alaikum Wr. Wb.`;
+  const defaultWaliInfoTemplate = `Assalamu'alaikum Wr. Wb. Bapak/Ibu Wali dari Ananda *{nama_santri}*.\n\nBerikut kami sampaikan informasi login default untuk mengakses aplikasi absensi PPMA:\n\n* Username: *{username}*\n* Password: *{password}*\n\nSilakan akses aplikasi pada tautan berikut: https://app.ppmawar.or.id/\n\nDemi keamanan akun, kami sarankan Bapak/Ibu untuk langsung mengubah password setelah berhasil login di halaman Profil.\n\nAtas perhatiannya kami ucapkan terima kasih.\n\nWassalamu'alaikum Wr. Wb.`;
 
-  const defaultGuruTemplate = `Assalamu'alaikum Wr. Wb. Ustadz/Ustadzah *{nama_guru}*.\n\nKami dari pengurus PPTQ menginformasikan pengingat jadwal mengajar/tugas Anda:\n\n* Kategori: {kegiatan}\n* Tempat/Kelas: {kelas}\n* Jam: {jam}\n\nLink Absensi: {link_absen}\n\nMohon untuk mengisi absensi tepat waktu. Atas perhatiannya kami ucapkan terima kasih.\n\nWassalamu'alaikum Wr. Wb.`;
+  const defaultGuruTemplate = `Assalamu'alaikum Wr. Wb. Ustadz/Ustadzah *{nama_guru}*.\n\nKami dari pengurus PPMA menginformasikan pengingat jadwal mengajar/tugas Anda:\n\n* Kategori: {kegiatan}\n* Tempat/Kelas: {kelas}\n* Jam: {jam}\n\nLink Absensi: {link_absen}\n\nMohon untuk mengisi absensi tepat waktu. Atas perhatiannya kami ucapkan terima kasih.\n\nWassalamu'alaikum Wr. Wb.`;
 
-  const defaultGuruInfoTemplate = `Assalamu'alaikum Wr. Wb. Ustadz/Ustadzah *{nama_guru}*.\n\nBerikut kami sampaikan informasi login default untuk mengakses aplikasi absensi PPTQ:\n\n* Username: *{username}*\n* Password: *${"{password}"}*\n\nSilakan akses aplikasi pada tautan berikut: https://app.pptq.ppmawar.or.id/\n\nDemi keamanan akun, kami sarankan Anda untuk langsung mengubah password setelah berhasil login di halaman Profil.\n\nAtas perhatiannya kami ucapkan terima kasih.\n\nWassalamu'alaikum Wr. Wb.`;
+  const defaultGuruInfoTemplate = `Assalamu'alaikum Wr. Wb. Ustadz/Ustadzah *{nama_guru}*.\n\nBerikut kami sampaikan informasi login default untuk mengakses aplikasi absensi PPMA:\n\n* Username: *{username}*\n* Password: *${"{password}"}*\n\nSilakan akses aplikasi pada tautan berikut: https://app.ppmawar.or.id/\n\nDemi keamanan akun, kami sarankan Anda untuk langsung mengubah password setelah berhasil login di halaman Profil.\n\nAtas perhatiannya kami ucapkan terima kasih.\n\nWassalamu'alaikum Wr. Wb.`;
 
   const [pesanWaliTemplate, setPesanWaliTemplate] = useState(defaultWaliTemplate);
   const [pesanWaliInfoTemplate, setPesanWaliInfoTemplate] = useState(defaultWaliInfoTemplate);
@@ -323,7 +323,7 @@ function NotifikasiContent() {
       .replace(/{kegiatan}/g, tipeLabel)
       .replace(/{kelas}/g, tempatLabel || '-')
       .replace(/{status}/g, statusAbsen)
-      .replace(/{link_laporan}/g, 'https://app.pptq.ppmawar.or.id/dashboard/notifikasi');
+      .replace(/{link_laporan}/g, 'https://app.ppmawar.or.id/dashboard/notifikasi');
 
     return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
   };
@@ -375,7 +375,7 @@ function NotifikasiContent() {
       .replace(/{kegiatan}/g, tipeLabel)
       .replace(/{kelas}/g, tempatLabel)
       .replace(/{jam}/g, 'Sesuai Jadwal')
-      .replace(/{link_absen}/g, 'https://app.pptq.ppmawar.or.id/dashboard/absen');
+      .replace(/{link_absen}/g, 'https://app.ppmawar.or.id/dashboard/absen');
 
     return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
   };
@@ -405,7 +405,7 @@ function NotifikasiContent() {
       .replace(/{kegiatan}/g, tipeLabel)
       .replace(/{kelas}/g, reminder.kelas_nama)
       .replace(/{jam}/g, `${reminder.jam_mulai.substring(0, 5)} - ${reminder.jam_selesai.substring(0, 5)}`)
-      .replace(/{link_absen}/g, 'https://app.pptq.ppmawar.or.id/dashboard/absen');
+      .replace(/{link_absen}/g, 'https://app.ppmawar.or.id/dashboard/absen');
 
     return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
   };
@@ -449,7 +449,7 @@ function NotifikasiContent() {
             }
 
             const fireTestNotification = async () => {
-              const title = 'Tes Notifikasi PPTQ';
+              const title = 'Tes Notifikasi PPMA';
               const options = {
                 body: 'Ini adalah tes notifikasi. Jika Anda melihat ini, berarti fitur Push Notification BEKERJA!',
                 icon: '/logo.png',

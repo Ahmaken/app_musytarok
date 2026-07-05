@@ -129,7 +129,6 @@ export default function DataMuridPage() {
     }
   };
 
-
   const fetchFilters = async () => {
     try {
       const [resMadin, resQuran, resKamar] = await Promise.all([
@@ -541,6 +540,7 @@ export default function DataMuridPage() {
   };
 
 
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
       {/* Header Halaman */}
@@ -603,8 +603,8 @@ export default function DataMuridPage() {
 
       {/* Tombol Aksi Admin */}
       {(role === 'admin' || role === 'staff') && (
-        <div className="flex justify-center -mt-2 max-w-2xl mx-auto w-full px-4">
-          <Link href="/dashboard/pairing" className="w-full sm:w-80 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3.5 rounded-2xl shadow-lg shadow-indigo-600/10 transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2.5 text-sm font-extrabold tracking-wide border border-indigo-500/50">
+        <div className="flex justify-center -mt-2 max-w-lg mx-auto w-full px-4">
+          <Link href="/dashboard/pairing" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3.5 rounded-2xl shadow-lg shadow-indigo-600/10 transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2.5 text-sm font-extrabold tracking-wide border border-indigo-500/50">
             <Camera size={18} className="text-indigo-200" /> Pairing Kartu Barcode Santri
           </Link>
         </div>
@@ -648,8 +648,6 @@ export default function DataMuridPage() {
         <button onClick={() => setShowFilters(!showFilters)} className={`px-3 py-2.5 border rounded-xl flex items-center justify-center transition-colors shrink-0 ${showFilters || filterMadin || filterQuran || filterKamar ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
           <Filter size={18} /> <span className="ml-2 text-xs font-bold sm:hidden">Filter</span>
         </button>
-
-
       </div>
 
       {/* Filter Panel */}

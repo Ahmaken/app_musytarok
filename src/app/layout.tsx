@@ -61,7 +61,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "PPTQ Absen",
+    title: "PPMA Absen",
   },
   formatDetection: {
     telephone: false,
