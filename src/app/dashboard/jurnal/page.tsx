@@ -6,11 +6,12 @@ import { exportToPDF, exportToExcel } from '@/lib/exportUtils';
 import { downloadTemplate } from '@/lib/downloadTemplate';
 
 export default function JurnalPage() {
-  const [jurnalData, setJurnalData] = useState<any>({ madin: [], quran: [], kamar: [] });
+  const [jurnalData, setJurnalData] = useState<any>({ quran: [], kamar: [] });
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState('tamu');
   const [userId, setUserId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<'madin' | 'quran' | 'kamar'>('madin');
+  // Tab madin disembunyikan — default ke 'quran'
+  const [activeTab, setActiveTab] = useState<'madin' | 'quran' | 'kamar'>('quran');
 
   // Import State
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -368,13 +369,12 @@ export default function JurnalPage() {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — tab Madrasah Diniyah disembunyikan */}
       <div className="flex bg-white dark:bg-gray-800 p-1.5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-x-auto">
-        {(['madin', 'quran', 'kamar'] as const).map((tab) => {
+        {(['quran', 'kamar'] as const).map((tab) => {
           const isActive = activeTab === tab;
           let activeBg = 'bg-blue-500 text-white shadow-md';
           if (tab === 'quran') activeBg = 'bg-emerald-500 text-white shadow-md';
-          if (tab === 'madin') activeBg = 'bg-indigo-500 text-white shadow-md';
           return (
             <button
               key={tab}
@@ -388,7 +388,7 @@ export default function JurnalPage() {
                   : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
               }`}
             >
-              {tab === 'madin' ? 'Madrasah Diniyah (Madin)' : tab === 'quran' ? "Al-Qur'an" : 'Kegiatan Kamar'}
+              {tab === 'quran' ? "Al-Qur'an" : 'Kegiatan Kamar'}
             </button>
           );
         })}

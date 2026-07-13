@@ -10,8 +10,8 @@ export default function KelasPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [role, setRole] = useState('guru');
-  // Tab visibility: array of tabs this user has access to
-  const [availableTabs, setAvailableTabs] = useState<Array<'quran' | 'madin'>>(['quran', 'madin']);
+  // Tab visibility: array of tabs this user has access to (madin disembunyikan)
+  const [availableTabs, setAvailableTabs] = useState<Array<'quran' | 'madin'>>(['quran']);
 
   useEffect(() => {
     const fetchMe = async () => {
@@ -31,8 +31,7 @@ export default function KelasPage() {
           // Admin/staff can see all tabs — filtering happens after role is known
           const tabs: Array<'quran' | 'madin'> = [];
           if (jadwalList.some((j: any) => j.tipe === 'quran')) tabs.push('quran');
-          if (jadwalList.some((j: any) => j.tipe === 'madin')) tabs.push('madin');
-          // If no jadwal found (e.g. admin), keep both tabs
+          // If no jadwal found, keep quran tab
           if (tabs.length > 0) {
             setAvailableTabs(tabs);
             // Set default tab to first available
@@ -185,9 +184,9 @@ export default function KelasPage() {
   const searchTambahRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canEdit = role === 'admin' || role === 'staff';
-  // For admin/staff, always show both tabs
+  // For admin/staff, always show both tabs (tetapi madin disembunyikan)
   const visibleTabs: Array<'quran' | 'madin'> = (role === 'admin' || role === 'staff')
-    ? ['quran', 'madin']
+    ? ['quran']
     : availableTabs;
 
   const handleEditClick = (item: any) => {

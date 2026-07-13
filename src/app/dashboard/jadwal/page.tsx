@@ -170,8 +170,8 @@ export default function JadwalPage() {
     }
   };
 
-  // Compute available tabs for non-admin/staff users
-  const availableTabs = (['quran', 'madin', 'kegiatan'] as const).filter((tipe) => {
+  // Fitur Madin disembunyikan — hanya tampilkan quran & kegiatan
+  const availableTabs = (['quran', 'kegiatan'] as const).filter((tipe) => {
     if (role === 'admin' || role === 'staff') return true;
     return jadwal.some((j) => j.tipe === tipe);
   });
@@ -179,7 +179,7 @@ export default function JadwalPage() {
   // Auto-switch activeTab if current tab not available for this user
   useEffect(() => {
     if (loading || role === 'admin' || role === 'staff') return;
-    if (availableTabs.length > 0 && !availableTabs.includes(activeTab)) {
+    if (availableTabs.length > 0 && !availableTabs.includes(activeTab as any)) {
       setActiveTab(availableTabs[0]);
     }
   }, [loading, jadwal, role]);
@@ -434,9 +434,7 @@ export default function JadwalPage() {
           {availableTabs.includes('quran') && (
             <button onClick={() => { setActiveTab('quran'); setSelectedJadwal([]); }} className={`flex-1 min-w-[120px] py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'quran' ? 'bg-emerald-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>Kelas Qur'an</button>
           )}
-          {availableTabs.includes('madin') && (
-            <button onClick={() => { setActiveTab('madin'); setSelectedJadwal([]); }} className={`flex-1 min-w-[120px] py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'madin' ? 'bg-teal-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>Kelas Madin</button>
-          )}
+          {/* Tab Kelas Madin disembunyikan */}
           {availableTabs.includes('kegiatan') && (
             <button onClick={() => { setActiveTab('kegiatan'); setSelectedJadwal([]); }} className={`flex-1 min-w-[120px] py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'kegiatan' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>Kegiatan Asrama</button>
           )}

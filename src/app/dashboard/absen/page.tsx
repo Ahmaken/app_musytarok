@@ -159,22 +159,7 @@ export default function InputAbsenPage() {
                   </button>
                 )}
 
-                {/* Madin */}
-                {tipeAda.has('madin') && (
-                  <button
-                    onClick={() => setFilter('madin')}
-                    className={`flex-1 min-w-[135px] flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
-                      filter === 'madin'
-                        ? 'bg-teal-500 text-white shadow-md'
-                        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                    }`}
-                  >
-                    Kelas Madin
-                    <span className={`text-[10px] px-3.5 py-0.5 rounded-full font-extrabold transition-colors ${
-                      filter === 'madin' ? 'bg-white/20 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
-                    }`}>{countByTipe('madin')}</span>
-                  </button>
-                )}
+                {/* Tab Kelas Madin disembunyikan */}
 
                 {/* Kegiatan */}
                 {tipeAda.has('kegiatan') && (

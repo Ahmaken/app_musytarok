@@ -747,16 +747,7 @@ export default function TabelJadwalPage() {
           Kelas Qur'an
         </button>
         )}
-        {(role === 'admin' || role === 'staff' || jadwalList.some(s => s.tipe === 'madin')) && (
-        <button 
-          onClick={() => { setActiveTab('madin'); setGenderMode('PUTRA'); }} 
-          className={`flex-1 py-3 text-sm font-extrabold rounded-xl transition-all text-center ${
-            activeTab === 'madin' ? 'bg-teal-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-          }`}
-        >
-          Kelas Madin
-        </button>
-        )}
+        {/* Tab Kelas Madin disembunyikan */}
         {(role === 'admin' || role === 'staff' || jadwalList.some(s => s.tipe === 'kegiatan')) && (
         <button 
           onClick={() => { setActiveTab('kegiatan'); setActiveAsrama('Asrama A'); }} 

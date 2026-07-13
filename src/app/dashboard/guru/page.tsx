@@ -345,7 +345,7 @@ export default function GuruPage() {
     exportData.forEach((item, idx) => {
       const tugas = [
         item.jabatan || 'Guru',
-        item.kelas_madin?.length ? `Madin: ${item.kelas_madin.join(', ')}` : '',
+        // Madin disembunyikan
         item.kelas_quran?.length ? `Quran: ${item.kelas_quran.join(', ')}` : '',
         item.kamar?.length ? `Kamar: ${item.kamar.join(', ')}` : ''
       ].filter(Boolean).join('\n');
@@ -473,13 +473,7 @@ export default function GuruPage() {
       {/* Filter Panel */}
       {showFilters && (
         <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 animate-in slide-in-from-top-2 duration-200 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tugas Madin</label>
-            <select value={filterMadin} onChange={(e) => setFilterMadin(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
-              <option value="">Semua Kelas Madin</option>
-              {madinList.map(k => <option key={k} value={k}>{k}</option>)}
-            </select>
-          </div>
+          {/* Filter Tugas Madin disembunyikan */}
           <div>
             <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tugas Qur'an</label>
             <select value={filterQuran} onChange={(e) => setFilterQuran(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
@@ -568,11 +562,7 @@ export default function GuruPage() {
                     <td className="px-4 py-3">
                       <div className="font-semibold text-indigo-600 dark:text-indigo-400 mb-1">{item.jabatan || 'Guru'}</div>
                       <div className="flex flex-col gap-1">
-                        {item.kelas_madin?.map((k: string, i: number) => (
-                          <span key={`m-${i}`} className="inline-flex items-center gap-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded text-[10px] font-semibold w-max">
-                            <BookOpen size={10} /> Madin: {k}
-                          </span>
-                        ))}
+                        {/* Tampilan kelas Madin disembunyikan */}
                         {item.kelas_quran?.map((k: string, i: number) => (
                           <span key={`q-${i}`} className="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded text-[10px] font-semibold w-max">
                             <BookOpen size={10} /> Qur'an: {k}
@@ -675,16 +665,8 @@ export default function GuruPage() {
 
                 <div className="space-y-4">
                   <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl space-y-3 border border-gray-100 dark:border-gray-700">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b dark:border-gray-700 pb-2">Tugas Akademik & Asrama</p>
-
-                    <div>
-                      <span className="text-xs text-gray-500 mb-1 block">Tugas Kelas Madin:</span>
-                      {viewingGuru.kelas_madin && viewingGuru.kelas_madin.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {viewingGuru.kelas_madin.map((k: string, i: number) => <span key={i} className="inline-flex items-center gap-1 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded text-xs font-semibold"><BookOpen size={10} /> {k}</span>)}
-                        </div>
-                      ) : <span className="text-xs font-semibold text-gray-400">-</span>}
-                    </div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b dark:border-gray-700 pb-2">Tugas Akademik & Asrama
+                    {/* Tugas Kelas Madin disembunyikan */}      </p>
 
                     <div>
                       <span className="text-xs text-gray-500 mb-1 block">Tugas Kelas Qur'an:</span>

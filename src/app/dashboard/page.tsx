@@ -210,8 +210,8 @@ export default function DashboardPage() {
 
       {/* Daftar Jadwal Hari Ini */}
       <section className="space-y-4">
-        {['kegiatan', 'quran', 'madin'].filter(tipe => role === 'admin' || role === 'staff' || allSchedules.some(s => s.tipe === tipe)).map(tipe => {
-          const tipeName = tipe === 'kegiatan' ? 'Kegiatan' : tipe === 'quran' ? "Qur'an" : 'Madin';
+        {['kegiatan', 'quran'].filter(tipe => role === 'admin' || role === 'staff' || allSchedules.some(s => s.tipe === tipe)).map(tipe => {
+          const tipeName = tipe === 'kegiatan' ? 'Kegiatan' : "Qur'an";
           const Icon = tipe === 'kegiatan' ? Clock : BookOpen;
           const tipeSchedules = schedules.filter(s => s.tipe === tipe);
           const activeSchedules = tipeSchedules.filter(s => s.status === 'aktif');
@@ -296,8 +296,8 @@ export default function DashboardPage() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {['quran', 'madin', 'kegiatan'].filter(tipe => role === 'admin' || role === 'staff' || allSchedules.some(s => s.tipe === tipe)).map((tipe) => {
-            const tipeName = tipe === 'quran' ? 'Qur\'an' : tipe === 'madin' ? 'Madin' : 'Kegiatan';
+          {['quran', 'kegiatan'].filter(tipe => role === 'admin' || role === 'staff' || allSchedules.some(s => s.tipe === tipe)).map((tipe) => {
+            const tipeName = tipe === 'quran' ? "Qur'an" : 'Kegiatan';
             return (
             <div key={tipe} className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 transition-colors duration-300">
               <h4 className="text-xs font-bold text-green-700 dark:text-green-400 mb-3 border-b dark:border-gray-700 pb-2">Statistik Absensi {tipeName}</h4>

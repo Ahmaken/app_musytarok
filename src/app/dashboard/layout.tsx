@@ -175,13 +175,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [user]);
 
   const hasQuran = userSchedules.some(s => s.tipe === 'quran');
-  const hasMadin = userSchedules.some(s => s.tipe === 'madin');
+  // hasMadin disembunyikan — fitur Madin dinonaktifkan
   const hasKegiatan = userSchedules.some(s => s.tipe === 'kegiatan');
 
-  const showQuranMadin = user?.role === 'admin' || user?.role === 'staff' || hasQuran || hasMadin;
+  const showQuranMadin = user?.role === 'admin' || user?.role === 'staff' || hasQuran;
   const showKamarAsrama = user?.role === 'admin' || user?.role === 'staff' || hasKegiatan;
-  const showDataSantri = user?.role === 'admin' || user?.role === 'staff' || hasQuran || hasMadin || hasKegiatan;
-  const showDataGuru = user?.role === 'admin' || user?.role === 'staff' || hasQuran || hasMadin || hasKegiatan;
+  const showDataSantri = user?.role === 'admin' || user?.role === 'staff' || hasQuran || hasKegiatan;
+  const showDataGuru = user?.role === 'admin' || user?.role === 'staff' || hasQuran || hasKegiatan;
 
   const toggleTheme = () => {
     if (isDark) {
@@ -470,11 +470,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <CalendarDays size={18} /> <span className="text-sm">Jadwal Alumni</span>
               </Link>
             </li>
-            <li>
-              <Link href="/dashboard/kurikulum" onClick={() => setShowSidebar(false)} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${pathname === '/dashboard/kurikulum' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 font-bold' : 'hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-bold'}`}>
-                <BookOpen size={18} /> <span className="text-sm">Kurikulum Madin</span>
-              </Link>
-            </li>
+            {/* Menu Kurikulum Madin disembunyikan */}
 
             {(user?.role === 'admin' || user?.role === 'pengurus_asrama' || user?.role === 'pengasuh' || user?.role === 'staff') && (
             <li>

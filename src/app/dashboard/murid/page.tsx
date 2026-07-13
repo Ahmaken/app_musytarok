@@ -463,7 +463,7 @@ export default function DataMuridPage() {
     const subtitle = `Filter: ${filterMadin || 'Semua Madin'} | ${filterQuran || "Semua Qur'an"} | ${filterKamar || 'Semua Kamar'}`;
     const filename = `Data_Santri`;
 
-    const tableColumn = ["NO", "NIS", "NAMA LENGKAP", "J. KELAMIN", "KELAS MADIN", "KELAS QUR'AN", "KAMAR"];
+    const tableColumn = ["NO", "NIS", "NAMA LENGKAP", "J. KELAMIN", "KELAS QUR'AN", "KAMAR"];
     const tableRows: any[] = [];
 
     exportData.forEach((item, idx) => {
@@ -472,7 +472,6 @@ export default function DataMuridPage() {
         item.nis || '-',
         item.nama,
         item.jenis_kelamin || '-',
-        item.kelas_madin || '-',
         item.kelas_quran || '-',
         item.nama_kamar || '-'
       ]);
@@ -630,9 +629,7 @@ export default function DataMuridPage() {
             <button onClick={() => openBulkModal('quran')} className="px-3 py-2.5 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-colors flex items-center gap-1.5">
               <CheckSquare size={14} /> Pindah Qur'an ({selectedMurid.length})
             </button>
-            <button onClick={() => openBulkModal('madin')} className="px-3 py-2.5 bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 border border-teal-200 dark:border-teal-800 rounded-xl text-xs font-bold hover:bg-teal-100 transition-colors flex items-center gap-1.5">
-              <CheckSquare size={14} /> Pindah Madin ({selectedMurid.length})
-            </button>
+            {/* Tombol Pindah Madin disembunyikan */}
             <button onClick={() => openBulkModal('kamar')} className="px-3 py-2.5 bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border border-orange-200 dark:border-orange-800 rounded-xl text-xs font-bold hover:bg-orange-100 transition-colors flex items-center gap-1.5">
               <CheckSquare size={14} /> Pindah Kamar ({selectedMurid.length})
             </button>
@@ -653,8 +650,8 @@ export default function DataMuridPage() {
       {/* Filter Panel */}
       {showFilters && (
         <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 animate-in slide-in-from-top-2 duration-200 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {/* Filter Madin — hanya tampil jika punya jadwal madin (atau admin/staff) */}
-          {hasMadinJadwal && (
+          {/* Filter Madin disembunyikan */}
+          {false && hasMadinJadwal && (
             <div>
               <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Kelas Madin</label>
               <select value={filterMadin} onChange={(e) => setFilterMadin(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-teal-500">
@@ -777,9 +774,7 @@ export default function DataMuridPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
-                        <span className="inline-flex items-center gap-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded text-[10px] font-semibold w-max">
-                          Madin: {item.kelas_madin || '-'}
-                        </span>
+                        {/* Tampilan kelas Madin disembunyikan */}
                         <span className="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded text-[10px] font-semibold w-max">
                           Qur'an: {item.kelas_quran || '-'}
                         </span>
@@ -926,10 +921,7 @@ export default function DataMuridPage() {
                 <div className="space-y-4">
                   <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl space-y-2 border border-gray-100 dark:border-gray-700">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Data Akademik & Asrama</p>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-gray-500">Kelas Madin:</span>
-                      <span className="font-bold">{viewingMurid.kelas_madin || '-'}</span>
-                    </div>
+                    {/* Kelas Madin disembunyikan */}
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-gray-500">Kelas Qur'an:</span>
                       <span className="font-bold">{viewingMurid.kelas_quran || '-'}</span>

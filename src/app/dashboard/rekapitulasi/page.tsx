@@ -21,7 +21,7 @@ export default function RekapitulasiPage() {
   const currentYear = new Date().getFullYear();
 
   const [filter, setFilter] = useState({
-    tipe: 'madin', // madin, quran, kegiatan, guru
+    tipe: 'quran', // quran, kegiatan, guru (madin disembunyikan)
     target_id: '',
     bulan: currentMonth.toString(),
     tahun: currentYear.toString()
@@ -42,7 +42,7 @@ export default function RekapitulasiPage() {
             fetchRekap(true);
           } else {
             // Load options for the first time for teachers/admins
-            loadOptions('madin');
+            loadOptions('quran');
           }
         }
       })
@@ -266,7 +266,7 @@ export default function RekapitulasiPage() {
           <div className="flex-1">
             <label className="block text-xs font-bold text-gray-500 mb-1">Pilih Tipe</label>
             <select value={filter.tipe} onChange={handleTipeChange} className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 px-4 py-2.5 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-purple-500 transition-all">
-              <option value="madin">Absensi Madin</option>
+              {/* Opsi Madin disembunyikan */}
               <option value="quran">Absensi Al-Qur'an</option>
               <option value="kegiatan">Absensi Kegiatan Asrama</option>
               {(role === 'admin' || role === 'staff') && (
